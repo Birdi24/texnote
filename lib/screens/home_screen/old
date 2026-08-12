@@ -1,0 +1,53 @@
+    return Scaffold(
+      backgroundColor: bg,
+
+      body: SafeArea(
+            child: ColoredBox(
+                color: bg,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 25.0),
+                      child: Transform.scale(
+                        scaleX: 1.0,
+                        scaleY: 1.1,
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          "All Notes",
+                          style: AppStyles.title,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 15,),
+                    Expanded(
+                      child: notes.isEmpty
+                          ? no_note_view(context, onNoteCreated)
+                          : notes_view(
+                        context,
+                        notes,
+                        onNoteCreated,
+                      ),
+                    ),
+                    Padding(padding: const EdgeInsets.only(bottom:10, right: 10),
+                      child:
+                      Align( alignment: Alignment.bottomRight,
+                        child: new_note_button(context, onNoteCreated, false),
+                      ),
+                    )
+                  ],
+                ),
+            )
+        ),
+    );
+
+
+
+    async {
+          print("New Note Started");
+          await Navigator.push<bool>( context,
+            MaterialPageRoute( builder: (_) => NoteScreen() ),
+          );
+          await onNoteCreated();
+          print("Back to home screen from note screen: new note");
+        },

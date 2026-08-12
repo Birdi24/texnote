@@ -1,0 +1,28 @@
+name: texnote
+description: "A new Flutter project."
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  saf: ^2.1.0
+  open_filex: ^4.5.0
+  cupertino_icons: ^1.0.8
+  path_provider: ^2.1.5
+  intl: ^0.20.3
+  flutter_markdown_plus: ^1.0.5
+  google_fonts: ^8.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+
+  uses-material-design: true

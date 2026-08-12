@@ -1,0 +1,3 @@
+Keyboard shortcut hints (Ctrl+S, Ctrl+Z, etc., especially on desktop)
+Search within note (Ctrl+F)
+Distraction-free/fullscreen editor

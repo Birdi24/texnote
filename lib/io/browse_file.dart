@@ -22,7 +22,7 @@ class FileOpenerScreen {
       final title = pickedFile.name.replaceFirst( RegExp(r'\.[^.]+$'), '', );
       final preview = body.length > 100 ? "${body.substring(0, 97)}..." : body;
       final finalTime = DateTime.fromMillisecondsSinceEpoch(pickedFile.lastModified);
-      return Note( title, body, preview, fileUri,finalTime);
+      return Note( title, body, fileUri,finalTime);
     } catch (e) {
       print("Error while executing browseFiles: $e"); return null;
     }

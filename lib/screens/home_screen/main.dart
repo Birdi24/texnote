@@ -13,7 +13,7 @@ import 'notes_view.dart';
 class HomeScreen extends StatefulWidget   {
   const HomeScreen({super.key});
 
-  Future<void> onNoteCreated() async {}
+  Future<void> onNoteChanged() async {}
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -23,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Note> notes = [];
   List<Collection> collections = [];
   List<Note> favorites = [];
-
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -50,13 +49,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _searchController.dispose();
-
     super.dispose();
   }
 
   Future<void> init_files() async {
     var savedNotes = await Note.collectNotes();
-
     collections = await load_collections();
     favorites = await load_favorites(savedNotes);
 
@@ -101,15 +98,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> onNoteCreated() async {
-    var savedNotes = await Note.collectNotes();
-
-    Note.sort_notes(savedNotes, sort);
-
+  void onNoteDeleted(Note note) {
     setState(() {
-      notes = savedNotes;
+      notes.remove(note);
+      favorites.remove(note);
+      for (var collection in collections) {
+        collection.notes.remove(note);
+      }
     });
+  }
 
+  Future<void> onNoteChanged() async {
+    Note.sort_notes(notes, sort);
+    setState(() {notes = notes;});
     print("New State Set");
   }
 
@@ -120,7 +121,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       control = n_control;
     });
 
-    // Move PageView when bottom nav is clicked
     if (_pageController.hasClients) {
       _pageController.animateToPage(
         n_control,
@@ -147,11 +147,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     debugPrint("Sort state: $sort");
 
     List<Note> new_notes = Note.sort_notes(notes, sort);
-
     setState(() {
       notes = new_notes;
     });
-
     print("New State Set");
   }
 
@@ -167,62 +165,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
 
             // NOTES AREA
-            Positioned(
-              top: 40,
-              left: 0,
-              right: 0,
-              bottom: 0,
+            Positioned(top: 40, left: 0, right: 0, bottom: 0,
 
               child: PageView(
                 controller: _pageController,
 
-                onPageChanged: (index) {
-                  setState(() {
-                    control = index;
-                  });
-                },
+                onPageChanged: (index) {setState(() {control = index;});},
 
                 children: [
 
                   // 0 = COLLECTIONS
                   displayedNotes.isEmpty
-                      ? no_collections_view(context, onNoteCreated,collections)
+                      ? no_collections_view(context, onNoteChanged,collections,notes)
                       : collections_view(
-                    context,
-                    collections,
-                    onNoteCreated,add_or_remove_favorite
+                    context, collections, onNoteChanged,add_or_remove_favorite
                   ),
 
                   // 1 = ALL
                   displayedNotes.isEmpty
-                      ? no_note_view(context, onNoteCreated,collections)
+                      ? no_note_view(context, onNoteChanged,collections, notes)
                       : notes_view(
                     context,
-                      displayedNotes,
-                    onNoteCreated,add_or_remove_favorite
+                      displayedNotes, onNoteChanged, onNoteDeleted, add_or_remove_favorite
                   ),
 
                   // 2 = FAVORITES
                   displayedNotes.isEmpty
-                      ? no_note_view(context, onNoteCreated, collections)
+                      ? no_note_view(context, onNoteChanged, collections, notes)
                       : notes_view(
                     context,
-                    displayedNotes,
-                    onNoteCreated, add_or_remove_favorite
+                    displayedNotes, onNoteChanged, onNoteDeleted, add_or_remove_favorite
                   ),
                 ],
               ),
             ),
-
             bg_gradient(),
-
-            top_button_cluster(
-              onNoteCreated,
-              onSortChanged,
-              context,
-              screen_width, onSearchChanged, _isSearching
-            ),
-
+            top_button_cluster(onNoteChanged, onSortChanged, context, screen_width, onSearchChanged, _isSearching),
             title(control),
 
             _isSearching ?
@@ -253,13 +231,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               )
                 ):
 
-            home_nav_bar(
-              onNoteCreated,
-              context,
-              screen_width,
-              control,
-              onControlChanged, collections
-            ),
+            home_nav_bar(onNoteChanged, context, screen_width, control, onControlChanged, collections,notes),
           ],
         ),
       ),

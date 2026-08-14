@@ -15,7 +15,7 @@ Widget browse_button(context,  Future<void> Function() onNoteCreated) {
         print("\npath: "+ note.path);
         print("\ntitle:" + note.title);
         await Navigator.push(context,
-            MaterialPageRoute(builder: (context) => NoteScreen(title: note.title, body: note.body,path: note.path))
+            MaterialPageRoute(builder: (context) => NoteScreen(note))
         );
       }
       await onNoteCreated();

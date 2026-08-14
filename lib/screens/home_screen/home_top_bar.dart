@@ -39,7 +39,7 @@ Widget bg_gradient(){
   );
 }
 
-Widget top_button_cluster(Function() onNoteCreated, Function() onSortChanged, context, screen_width, Function() onSearchChanged, bool _isSearching) {
+Widget top_button_cluster(Function() onNoteChanged, Function() onSortChanged, context, screen_width, Function() onSearchChanged, bool _isSearching) {
   return
 
     Positioned(
@@ -53,7 +53,7 @@ Widget top_button_cluster(Function() onNoteCreated, Function() onSortChanged, co
               children: [
                 single_nav_button(Icons.search, 20.0,90, "Sort", onSearchChanged, context, screen_width, button_width: 45.0 ),
                 single_nav_button(Icons.sort_sharp, 20.0,90, "Sort", onSortChanged, context, screen_width, button_width: 45.0 ),
-                single_nav_button(Icons.more_horiz, 20.0,90, "settings", onNoteCreated, context, screen_width, button_width: 45.0 ),
+                single_nav_button(Icons.more_horiz, 20.0,90, "settings", onNoteChanged, context, screen_width, button_width: 45.0 ),
               ]
           )
       ),

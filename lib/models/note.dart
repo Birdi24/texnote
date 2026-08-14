@@ -9,12 +9,10 @@ class Note {
   String title;
   String body;
   String path;
-  String? preview;
   DateTime date;
   bool is_fav = false;
-  List<String> collection_list = [];
 
-  Note(this.title, this.body, this.preview, this.path, this.date);
+  Note(this.title, this.body,  this.path, this.date);
 
   String date_string() {
     return DateFormat('h:mm a - MMM d, yyyy').format(date);
@@ -26,9 +24,8 @@ class Note {
     if (await file.exists()) {
       final body = await file.readAsString();
       final title = p.basenameWithoutExtension(path);
-      final preview = body.length > 100 ? "${body.substring(0, 97)}..." : body;
       final finalTime = await file.lastModified();
-      return Note(title, body, preview, path, finalTime);
+      return Note(title, body, path, finalTime);
     }
     throw Exception("File does not exist at $path");
   }
@@ -40,7 +37,9 @@ class Note {
 
     final files = directory
         .listSync()
-        .where((file) => file.path.endsWith('.txt'))
+        .where((file) =>
+    file.path.endsWith('.txt') &&
+        !file.uri.pathSegments.last.startsWith('.'))
         .map((file) => File(file.path))
         .toList();
 
@@ -54,10 +53,7 @@ class Note {
       String title = path.split('/').last.replaceAll('.txt', '');
       String body = await files[i].readAsString();
       DateTime date = await files[i].lastModified();
-      String preview = body.length > 100
-          ? "${body.substring(0, 97)}..."
-          : body;
-      notes.add(Note(title,body,preview,path, date ));
+      notes.add(Note(title,body,path, date ));
       i++;
     }
     return notes;
@@ -155,6 +151,7 @@ class Note {
 
   Future<void> deleteNote() async {
     final file = File(path);
+    print(path);
 
     if (await file.exists()) {
       await file.delete();

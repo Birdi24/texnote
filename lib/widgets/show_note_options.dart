@@ -5,7 +5,7 @@ import '../app_style.dart';
 import '../models/note.dart';
 import '../screens/home_screen/notes_view.dart';
 
-void show_note_options(BuildContext context, Note note, Future<void> Function() onNoteCreated , void Function(Note) add_to_favorites) {
+void show_note_options(BuildContext context, List<Note> notes,int index, Future<void> Function() onNoteChanged , void Function(Note) onNoteDeleted, void Function(Note) add_to_favorites) {
   double screen_width =  MediaQuery.of(context).size.width;
 
   showModalBottomSheet(
@@ -32,11 +32,11 @@ void show_note_options(BuildContext context, Note note, Future<void> Function() 
                     ),
 
                     ListTile(
-                      leading: Icon(Icons.star_outline ,color:  note.is_fav? Colors.red : icon_color),
-                      title: note.is_fav? Text('Remove from favorites' ,style: TextStyle(color: Colors.red),) : Text('Add to favorites'),
+                      leading: Icon(Icons.star_outline ,color:  notes[index].is_fav? Colors.red : icon_color),
+                      title: notes[index].is_fav? Text('Remove from favorites' ,style: TextStyle(color: Colors.red),) : Text('Add to favorites'),
                       onTap: () {
                         Navigator.pop(context);
-                        add_to_favorites(note);
+                        add_to_favorites(notes[index]);
                       },
                     ),
 
@@ -45,7 +45,7 @@ void show_note_options(BuildContext context, Note note, Future<void> Function() 
                       title: const Text('Duplicate'),
                       onTap: () {
                         Navigator.pop(context);
-                        note.duplicate_note(onNoteCreated);
+                        notes[index].duplicate_note(onNoteChanged);
                       },
                     ),
 
@@ -76,9 +76,9 @@ void show_note_options(BuildContext context, Note note, Future<void> Function() 
                         'Delete note',
                         style: TextStyle(color: Colors.red),
                       ),
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        delete_alert(context, note);
+                        delete_alert(context,notes,index, onNoteDeleted);
                       },
                     ),
                   ],

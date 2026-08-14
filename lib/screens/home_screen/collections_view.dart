@@ -8,7 +8,7 @@ import '../../models/note.dart';
 Widget collections_view(
     context,
     List<Collection> collections,
-    Future<void> Function() onNoteCreated,
+    Future<void> Function() onNoteChanged,
     void Function(Note) add_or_remove_favorites
     ) {
   return
@@ -30,18 +30,18 @@ Widget collections_view(
               context,
               collections,
               index,
-              onNoteCreated, add_or_remove_favorites
+              onNoteChanged, add_or_remove_favorites
           );
         },
       ),
     );
 }
 
-Widget single_collection(BuildContext context, List<Collection> collections, int index, Future<void> Function() onNoteCreated, void Function(Note) add_or_remove_favorites) {
+Widget single_collection(BuildContext context, List<Collection> collections, int index, Future<void> Function() onNoteChanged, void Function(Note) add_or_remove_favorites) {
   Collection collection = collections[index];
   return GestureDetector(
-    //onLongPress: () {show_note_options(context, note, onNoteCreated, add_or_remove_favorites);},
-    //onDoubleTap: () {show_note_options(context, note, onNoteCreated, add_or_remove_favorites);},
+    //onLongPress: () {show_note_options(context, note, onNoteChanged, add_or_remove_favorites);},
+    //onDoubleTap: () {show_note_options(context, note, onNoteChanged, add_or_remove_favorites);},
     ///onTap: () async {
     ///print("opening a note from list");
     ///await Navigator.push(
@@ -54,7 +54,7 @@ Widget single_collection(BuildContext context, List<Collection> collections, int
     /// ),
     /// ),
     ///);
-    ///await onNoteCreated();
+    ///await onNoteChanged();
     ///print("Back to home screen from note screen :cards");
     ///},
     child: Column(

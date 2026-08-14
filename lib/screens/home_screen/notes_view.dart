@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../app_style.dart';
 import '../../models/note.dart';
@@ -9,25 +11,22 @@ Widget single_note(
   context,
   notes,
   index,
-  Future<void> Function() onNoteCreated,
+  Future<void> Function() onNoteChanged,
+  void Function(Note) onNoteDeleted,
   void Function(Note) add_to_favorites ) {
   Note note = notes[index];
   return GestureDetector(
-    onLongPress: () {show_note_options(context, note, onNoteCreated, add_to_favorites);},
-    onDoubleTap: () {show_note_options(context, note, onNoteCreated, add_to_favorites);},
+    onLongPress: () {show_note_options(context, notes, index, onNoteChanged, onNoteDeleted, add_to_favorites);},
+    onDoubleTap: () {show_note_options(context, notes, index, onNoteChanged, onNoteDeleted, add_to_favorites);},
     onTap: () async {
       print("opening a note from list");
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => NoteScreen(
-            title: note.title,
-            body: note.body,
-            path: note.path,
-          ),
+          builder: (_) => NoteScreen(note),
         ),
       );
-      await onNoteCreated();
+      await onNoteChanged();
       print("Back to home screen from note screen :cards");
     },
     child: Column(
@@ -90,7 +89,7 @@ Widget single_note(
   );
 }
 
-Future<bool?> delete_alert(BuildContext context, Note note) {
+Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, void Function(Note) onNoteDeleted) {
   return showDialog<bool>(
     context: context,
     builder: (context) {
@@ -107,7 +106,7 @@ Future<bool?> delete_alert(BuildContext context, Note note) {
           style: AppStyles.subtitle,
         ),
         content: Text(
-          'Are you sure you want to delete\n"${note.title}"?',
+          'Are you sure you want to delete\n"${notes[index].title}"?',
           style: AppStyles.bodytext,
         ),
         actions: [
@@ -116,7 +115,7 @@ Future<bool?> delete_alert(BuildContext context, Note note) {
             height: 40,
             child: TextButton(
               onPressed: () {
-                Navigator.pop(context, false);
+                Navigator.pop(context);
               },
               child: Text(
                 "Cancel",
@@ -128,8 +127,11 @@ Future<bool?> delete_alert(BuildContext context, Note note) {
             width: 125,
             height: 40,
             child: TextButton(
-              onPressed: () {
-                Navigator.pop(context, true);
+              onPressed: () async{
+                Note noteToDelete = notes[index];
+                Navigator.pop(context);
+                await noteToDelete.deleteNote();
+                onNoteDeleted(noteToDelete);
               },
               child: Text(
                 "Delete",
@@ -146,7 +148,8 @@ Future<bool?> delete_alert(BuildContext context, Note note) {
 Widget notes_view(
     context,
     notes,
-    Future<void> Function() onNoteCreated,
+    Future<void> Function() onNoteChanged,
+    void Function(Note) onNoteDeleted,
     void Function(Note) add_to_favorites
     ) {
   return
@@ -155,7 +158,7 @@ Widget notes_view(
     child:
         GridView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(top: 40, bottom: 90, left:20, right:20),
+          padding: EdgeInsets.only(top: 50, bottom: 90, left:20, right:20),
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: 260,
             mainAxisExtent: 300,
@@ -168,7 +171,9 @@ Widget notes_view(
               context,
               notes,
               index,
-              onNoteCreated, add_to_favorites
+              onNoteChanged,
+              onNoteDeleted,
+              add_to_favorites
             );
           },
         ),

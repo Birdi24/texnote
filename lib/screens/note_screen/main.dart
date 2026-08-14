@@ -8,16 +8,9 @@ import 'note_botton.dart';
 import 'note_top.dart';
 
 class NoteScreen extends StatefulWidget {
-  final String? title;
-  final String? body;
-  final String? path;
-
-  const NoteScreen({
-  super.key,
-  this.title,
-  this.body,
-  this.path,
-  });
+  Note note;
+  
+  NoteScreen(this.note);
 
   @override
   State<NoteScreen> createState() => _NoteScreenState();
@@ -38,12 +31,12 @@ class _NoteScreenState extends State<NoteScreen> {
   @override
   void initState() {
     super.initState();
-    titleController = TextEditingController(text: widget.title ?? "",);
-    bodyController = TextEditingController(text: widget.body ?? "",);
-    markdownData = widget.body ?? "";
+    titleController = TextEditingController(text: widget.note.title ?? "",);
+    bodyController = TextEditingController(text: widget.note.body ?? "",);
+    markdownData = widget.note.body ?? "";
     titleController.addListener(_markChanged);
     bodyController.addListener(_markChanged);
-    old_title = widget.title ?? "";
+    old_title = widget.note.title ?? "";
     _autoSaveTimer = Timer.periodic( const Duration(minutes: 1), (_) => save(),);
 
   }
@@ -78,10 +71,10 @@ class _NoteScreenState extends State<NoteScreen> {
   Future<void> save() async {
     if (!changed) {debugPrint("Save skipped: no changes");return;}
     debugPrint("Saving...");
-    final directory = await getDirectory();
-    Note note = Note(titleController.text, bodyController.text, "", directory, DateTime.now());
+    widget.note.title = titleController.text;
+    widget.note.body = bodyController.text;
 
-    await note.saveNote(_currentTime, old_title,);
+    await widget.note.saveNote(_currentTime, old_title,);
     if (!mounted) return;
     setState(() {
       changed = false;_lastSaved = DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now());

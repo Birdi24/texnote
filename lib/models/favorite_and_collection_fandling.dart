@@ -24,6 +24,7 @@ Future<List<Note>> load_favorites(List<Note> all_notes) async {
       }
       return ret;
     }
+    else { await fav_file.create(recursive: true);}
     return [];
   }
   catch (e) {
@@ -51,8 +52,6 @@ Future<void> save_favorites(List<Note> all_notes) async{
   }
 }
 
-
-
 Future<List<Collection>> load_collections() async {
   try {
     List<Collection> collections = [];
@@ -69,7 +68,7 @@ Future<List<Collection>> load_collections() async {
         if (currentName != null) {
           collections.add(
             Collection(
-              currentName!,
+              currentName,
               currentColor!,
               List<Note>.from(currentNotes),
             ),
@@ -105,7 +104,9 @@ Future<List<Collection>> load_collections() async {
           );
         }
       }
+      saveCurrentCollection();
     }
+    else { await fav_file.create(recursive: true);}
     return collections;
   }
   catch (e) {

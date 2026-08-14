@@ -5,7 +5,7 @@ import '../../app_style.dart';
 import '../../widgets/browse_file_button.dart';
 import '../../widgets/new_file_button.dart';
 
-Widget no_collections_view(context, Future<void> Function() onNoteCreated,collections) {
+Widget no_collections_view(context, Future<void> Function() onNoteChanged,collections,notes) {
   return Center(
     child: Padding(
       padding: const EdgeInsets.all(24),
@@ -25,9 +25,9 @@ Widget no_collections_view(context, Future<void> Function() onNoteCreated,collec
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              browse_button(context,onNoteCreated),
+              browse_button(context,onNoteChanged),
               const SizedBox(width: 16),
-              new_note_button(context,onNoteCreated,collections),
+              new_note_button(context,onNoteChanged,collections,notes),
             ],
           ),
         ],

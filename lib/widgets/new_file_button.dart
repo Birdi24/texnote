@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import '../app_style.dart';
 import '../models/favorite_and_collection_fandling.dart';
+import '../models/note.dart';
 import '../screens/note_screen/main.dart';
 import 'glass_container.dart';
 import 'package:flutter/cupertino.dart';
 
-void new_file_options(BuildContext context, Future<void> Function() onNoteCreated, collections) {
+void new_file_options(BuildContext context, Future<void> Function() onNoteCreated, collections, notes) {
   double screen_width =  MediaQuery.of(context).size.width;
 
   showModalBottomSheet(
@@ -27,8 +29,10 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                       title: const Text('New note'),
                       onTap: () async {
                         print("New Note Started");
+                        final note = Note("","",(await getApplicationDocumentsDirectory()).path,DateTime.now());
+                        notes.add(note);
                         await Navigator.push<bool>( context,
-                          MaterialPageRoute( builder: (_) => NoteScreen() ),
+                          MaterialPageRoute( builder: (_) => NoteScreen(note)),
                         );
                         await onNoteCreated();
                         print("Back to home screen from note screen: new note");
@@ -188,10 +192,10 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
   );
 }
 
-Widget new_note_button( BuildContext context, Future<void> Function() onNoteCreated, collections
+Widget new_note_button( BuildContext context, Future<void> Function() onNoteCreated, collections, notes
     ) {
   return GestureDetector(
-    onTap: () { new_file_options(context, onNoteCreated, collections);},
+    onTap: () { new_file_options(context, onNoteCreated, collections,notes);},
     child: glassContainer(
       width: 170,
       height: 78,

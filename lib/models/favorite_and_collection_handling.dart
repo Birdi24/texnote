@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'note.dart';
 
@@ -24,33 +25,39 @@ Future<List<Note>> load_favorites(List<Note> all_notes) async {
       }
       return ret;
     }
-    else { await fav_file.create(recursive: true);}
+    else { await fav_file.create(recursive: true);debugPrint("Favorites file not found, creating new one.");}
     return [];
   }
   catch (e) {
-    print("Could not load the favorites file: $e");
+    debugPrint("Could not load the favorites file: $e");
     return [];
   }
 }
 
-Future<void> save_favorites(List<Note> all_notes) async{
+Future<void> save_favorites(List<Note> all_notes) async {
   try {
     final dir = await getApplicationDocumentsDirectory();
-    final file_path = dir.path + "/.favorites.txt";
-    File fav_file = File(file_path);
-    String body = "";
-    if (await fav_file.exists()) {
-      for (final note in all_notes) {
-        if (note.is_fav) {
-          body += "${note.path}\n";
-        }
-      }
-      fav_file.writeAsString(body);
-    }
+    final filePath = "${dir.path}/.favorites.txt";
+    final favFile = File(filePath);
+
+    final favoritePaths = all_notes
+        .where((note) => note.is_fav)
+        .map((note) => note.path)
+        .join('\n');
+
+    await favFile.writeAsString(
+      favoritePaths.isEmpty ? '' : '$favoritePaths\n',
+    );
+
+    debugPrint(
+      "Favorites saved successfully. Count: "
+          "${all_notes.where((note) => note.is_fav).length}",
+    );
   } catch (e) {
-    print("Could not save the favorites file: $e");
+    debugPrint("Could not save the favorites file: $e");
   }
 }
+
 
 Future<List<Collection>> load_collections() async {
   try {
@@ -106,36 +113,42 @@ Future<List<Collection>> load_collections() async {
       }
       saveCurrentCollection();
     }
-    else { await fav_file.create(recursive: true);}
+    else { await fav_file.create(recursive: true); debugPrint("Collections file not found, creating new one.");}
     return collections;
   }
   catch (e) {
-    print("Could not load the collections file: $e");
+    debugPrint("Could not load the collections file: $e");
     return [];
   }
 }
 
 Future<void> save_collections(List<Collection> collections) async {
   try {
+    final dir = await getApplicationDocumentsDirectory();
+    final filePath = "${dir.path}/.collections.txt";
+    final file = File(filePath);
+
     String body = "";
-    for (int i = 0; i < collections.length; i++) {
-      body += "[${collections[i].title}]\n";
-      body += "color=${collections[i].color}\n";
-      for (int j = 0; j < collections[i].notes.length; j++) {
-        body += "path=${collections[i]}\n";
+
+    for (final collection in collections) {
+      body += "[${collection.title}]\n";
+      body += "color=${collection.color}\n";
+
+      for (final note in collection.notes) {
+        body += "path=${note.path}\n";
       }
+
       body += "\n";
     }
-    final dir = await getApplicationDocumentsDirectory();
-    final file_path = dir.path + "/.collections.txt";
-    File fav_file = File(file_path);
 
-    fav_file.writeAsString(body);
-  }
-  catch (e) {
-    print("Could not save the collections file: $e");
-  }
+    await file.writeAsString(body);
 
+    debugPrint(
+      "Collections saved successfully. Count: ${collections.length}",
+    );
+  } catch (e) {
+    debugPrint("Could not save the collections file: $e");
+  }
 }
 
 
@@ -154,6 +167,35 @@ class Collection {
   bool remove_from_collections(Note note){
     if (!notes.contains(note)) {return false;}
     notes.remove(note); return true;
+  }
+
+  /// by: 0 means least number of notes
+  /// by: 1 means most number of notes
+  /// by: 2 means alphabetical order
+  static List<Collection> sort_collections(List<Collection> collections, int by) {
+    for (final collection in collections) {
+      Note.sort_notes(collection.notes, by);
+    }
+    switch (by) {
+      case 0:
+        collections.sort(
+              (a, b) => a.notes.length.compareTo(b.notes.length),
+        );
+        break;
+      case 1:
+        collections.sort(
+              (a, b) => b.notes.length.compareTo(a.notes.length),
+        );
+        break;
+      case 2:
+        collections.sort(
+              (a, b) => a.title.toLowerCase().compareTo(
+            b.title.toLowerCase(),
+          ),
+        );
+        break;
+    }
+    return collections;
   }
 
   void rename_collection(String new_name) {

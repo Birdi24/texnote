@@ -16,6 +16,7 @@ Widget glassContainer({
   Color? borderColor,
   double borderAlpha = 17,
   Color shadowColor = BG,
+  int bgAlpha = 10
 
 }) {
   return ClipRRect(
@@ -35,7 +36,7 @@ Widget glassContainer({
           ),
           boxShadow: [
             BoxShadow(
-              color: shadowColor.withAlpha(10),
+              color: shadowColor.withAlpha(bgAlpha),
               blurRadius: 20,
               offset: const Offset(0, 6),
             ),

@@ -5,14 +5,34 @@ import 'package:flutter/material.dart';
 import '../../app_style.dart';
 import 'home_nav_bar.dart';
 
-Widget title(int control) {
-  final text = ["Collections", "All Notes", "Favorites"];
+Widget title(int control, _selectedCollection) {
+  final text_src = ["Collections", "All Notes", "Favorites"];
+  String text = text_src[control];
+  if (_selectedCollection != null && control == 0) {text = "Collection: ${_selectedCollection.title}";}
+
+  return IgnorePointer(child: Text(text, style: AppStyles.title ));
+}
+
+Widget top_left_cluster(int control, _selectedCollection, closeCollection, context, screen_width,) {
+  bool in_collection = (_selectedCollection != null && control == 0);
   return Positioned(
-      top: 10,
-      left: 25,
-      right: 15,
-      child: IgnorePointer(child: Text(text[control], style: AppStyles.title ),)
+    top: 15,
+    left: 25,
+
+    child: Align(
+        alignment: Alignment.topLeft,
+        child: Row(
+            spacing: 10,
+            children: [
+              in_collection ?
+                single_nav_button(Icons.arrow_back_ios_new, 20.0,90, "Back",closeCollection, context, screen_width, button_width: 45.0 )
+                : SizedBox.shrink(),
+              title(control,_selectedCollection)
+            ]
+        )
+    ),
   );
+
 }
 
 Widget bg_gradient(){
@@ -39,7 +59,7 @@ Widget bg_gradient(){
   );
 }
 
-Widget top_button_cluster(Function() onNoteChanged, Function() onSortChanged, context, screen_width, Function() onSearchChanged, bool _isSearching) {
+Widget top_right_button_cluster(Function() onNoteChanged, Function() onSortChanged, context, screen_width, Function() onSearchChanged, bool _isSearching) {
   return
 
     Positioned(

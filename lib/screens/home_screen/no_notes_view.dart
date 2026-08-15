@@ -5,7 +5,8 @@ import '../../app_style.dart';
 import '../../widgets/browse_file_button.dart';
 import '../../widgets/new_file_button.dart';
 
-Widget no_note_view(context, Future<void> Function() onNoteChanged,collections, notes) {
+Widget no_note_view(context, Future<void> Function() onNoteChanged,collections, notes, control,add_or_remove_favorite,selected_collection) {
+  bool in_fav = control == 2;
   return Center(
     child: Padding(
       padding: const EdgeInsets.all(24),
@@ -14,7 +15,7 @@ Widget no_note_view(context, Future<void> Function() onNoteChanged,collections, 
         children: [
           const Icon( Icons.note_add_outlined, size: 72),
           const SizedBox(height: 12),
-          Text( "No notes yet", style: AppStyles.title2, ),
+          Text( in_fav? "No favorite notes yet": "No notes yet", style: AppStyles.title2, ),
           const SizedBox(height: 8),
 
           Text( "Create a new note or browse your device to import one.",
@@ -27,7 +28,7 @@ Widget no_note_view(context, Future<void> Function() onNoteChanged,collections, 
             children: [
               browse_button(context,onNoteChanged),
               const SizedBox(width: 16),
-              new_note_button(context,onNoteChanged, collections,notes),
+              new_note_button(context,onNoteChanged, collections,notes,control,add_or_remove_favorite,selected_collection, false),
             ],
           ),
         ],

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../app_style.dart';
 import '../../models/note.dart';
+import '../../widgets/glass_container.dart';
 import '../../widgets/show_note_options.dart';
 import '../note_screen/main.dart';
 
@@ -10,14 +11,14 @@ import '../note_screen/main.dart';
 Widget single_note(
   context,
   notes,
-  index,
+  index, collections,
   Future<void> Function() onNoteChanged,
   void Function(Note) onNoteDeleted,
   void Function(Note) add_to_favorites ) {
   Note note = notes[index];
   return GestureDetector(
-    onLongPress: () {show_note_options(context, notes, index, onNoteChanged, onNoteDeleted, add_to_favorites);},
-    onDoubleTap: () {show_note_options(context, notes, index, onNoteChanged, onNoteDeleted, add_to_favorites);},
+    onLongPress: () {show_note_options(context, notes, index,  collections,onNoteChanged,onNoteDeleted, add_to_favorites);},
+    onDoubleTap: () {show_note_options(context, notes, index, collections, onNoteChanged, onNoteDeleted, add_to_favorites);},
     onTap: () async {
       print("opening a note from list");
       await Navigator.push(
@@ -39,7 +40,7 @@ Widget single_note(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.black,
+                color: icon_color,
                 width: 1,
               ),
             ),
@@ -50,7 +51,7 @@ Widget single_note(
                 maxLines: 10,
                 overflow: TextOverflow.fade,
                 style: const TextStyle(
-                  color: Colors.black87,
+                  color: icon_color,
                   fontSize: 13,
                   height: 1.5,
                 ),
@@ -68,7 +69,7 @@ Widget single_note(
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            color: Colors.black,
+            color: icon_color,
             fontSize: 15,
             fontWeight: FontWeight.w500,
           ),
@@ -90,64 +91,77 @@ Widget single_note(
 }
 
 Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, void Function(Note) onNoteDeleted) {
+  final screen_width = MediaQuery.of(context).size.width;
   return showDialog<bool>(
+    barrierColor: Colors.transparent,
     context: context,
     builder: (context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(
-            color: icon_color,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        title: Text(
-          "Delete note?",
-          style: AppStyles.subtitle,
-        ),
-        content: Text(
-          'Are you sure you want to delete\n"${notes[index].title}"?',
-          style: AppStyles.bodytext,
-        ),
-        actions: [
-          SizedBox(
-            width: 125,
-            height: 40,
-            child: TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text(
-                "Cancel",
-                style: AppStyles.bodytext,
+      return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: glassContainer(
+            bgAlpha: 10,
+            borderAlpha: 244,
+            borderColor: Colors.red,
+            height: 278,
+            width: screen_width > 420 ? 370 : screen_width - 50,
+            shadowColor: BG,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+
+                    const SizedBox(height: 45),
+                    const Text(
+                      "Delete note?",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Text(
+                      textAlign: TextAlign.center,
+                      'Are you sure you want to delete\n"${notes[index].title}"?',
+                    ),
+
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: icon_color),),
+                        ),
+
+                        const SizedBox(width: 15),
+
+                        ElevatedButton(
+                          onPressed: () async{
+                            Note noteToDelete = notes[index];
+                            Navigator.pop(context);
+                            await noteToDelete.deleteNote();
+                            onNoteDeleted(noteToDelete);
+                          },
+                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  ]
               ),
-            ),
-          ),
-          SizedBox(
-            width: 125,
-            height: 40,
-            child: TextButton(
-              onPressed: () async{
-                Note noteToDelete = notes[index];
-                Navigator.pop(context);
-                await noteToDelete.deleteNote();
-                onNoteDeleted(noteToDelete);
-              },
-              child: Text(
-                "Delete",
-                style: AppStyles.red_text,
-              ),
-            ),
-          ),
-        ],
+            ),)
       );
-    },
-  );
+    }
+    );
 }
+
 
 Widget notes_view(
     context,
-    notes,
+    notes, collections,
     Future<void> Function() onNoteChanged,
     void Function(Note) onNoteDeleted,
     void Function(Note) add_to_favorites
@@ -170,7 +184,7 @@ Widget notes_view(
             return single_note(
               context,
               notes,
-              index,
+              index, collections,
               onNoteChanged,
               onNoteDeleted,
               add_to_favorites

@@ -8,7 +8,7 @@ import '../../widgets/glass_container.dart';
 import '../../widgets/new_file_button.dart';
 
 
-Widget home_nav_bar(onNoteChanged, context, screen_width, control, onControlChanged, collections,notes) {
+Widget home_nav_bar(onNoteChanged, context, screen_width, control, onControlChanged, collections,notes,add_or_remove_favorite,selected_collection) {
   return Align(
     alignment: Alignment.bottomCenter,
     child: Padding(
@@ -51,7 +51,7 @@ Widget home_nav_bar(onNoteChanged, context, screen_width, control, onControlChan
             Icons.add,
             34.0,
             34,
-            "Add", () async { new_file_options(context, onNoteChanged,collections, notes);},
+            "Add", () async { new_file_options(context, onNoteChanged,collections, notes,control,add_or_remove_favorite,selected_collection);},
             context,
             screen_width,
             button_width: (screen_width > 600) ? 68 : 58,
@@ -124,7 +124,7 @@ Widget single_nav_button(
       color: Colors.transparent,
       child: InkWell(
         onTap: () async {
-          print("button hit");
+          debugPrint("Add button hit");
           await function();
         },
         customBorder: const CircleBorder(),

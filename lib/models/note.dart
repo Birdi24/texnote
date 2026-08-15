@@ -1,11 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:path_provider/path_provider.dart';
 import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 
 class Note {
-
   String title;
   String body;
   String path;
@@ -33,23 +33,19 @@ class Note {
   static Future<List<Note>> collectNotes() async {
     final directory = await getApplicationDocumentsDirectory();
 
-    print("Directory: ${directory.path}");
+    debugPrint("Directory: ${directory.path}");
 
-    final files = directory
-        .listSync()
-        .where((file) =>
-    file.path.endsWith('.txt') &&
-        !file.uri.pathSegments.last.startsWith('.'))
-        .map((file) => File(file.path))
-        .toList();
+    ///final files = directory .listSync() .where((file) => file.path.endsWith('.txt')) .map((file) => File(file.path)) .toList();
 
-    print("Files found: ${files.length}");
+    final files = directory.listSync().where((file) => file.path.endsWith('.txt') &&   !file.uri.pathSegments.last.startsWith('.')).map((file) => File(file.path)).toList();
+
+    debugPrint("Files found: ${files.length}");
 
     List<Note> notes = [];
     var i = 0;
     while (i < files.length) {
       String path = files[i].path;
-      print(path);
+      debugPrint("Processing file: $path");
       String title = path.split('/').last.replaceAll('.txt', '');
       String body = await files[i].readAsString();
       DateTime date = await files[i].lastModified();
@@ -67,20 +63,17 @@ class Note {
         newTitle = sanitizeFileName(time);
       }
 
-      // ============================================================
-      // IMPORTED ANDROID FILE
-      // ============================================================
       if (path.startsWith('content://')) {
         final saf = Saf();
 
-        print("Saving imported file");
-        print("Original URI: $path");
+        debugPrint("Saving imported file");
+        debugPrint("Original URI: $path");
 
         final uri = Uri.parse(path);
 
         // If the title changed, rename the ORIGINAL Android document.
         if (oldTitle.isNotEmpty && newTitle != oldTitle) {
-          print("Imported file title changed");
+          debugPrint("Imported file title changed");
 
           final renamedFile = await saf.rename(
             uri.toString(),
@@ -90,8 +83,8 @@ class Note {
           // SAF can return a new URI after a rename.
           path = renamedFile.uri;
 
-          print("Renamed file");
-          print("New URI: $path");
+          debugPrint("Renamed file");
+          debugPrint("New URI: $path");
         }
 
         final existingFile = await saf.stat(
@@ -104,31 +97,39 @@ class Note {
 
         // The current saf API writes a file by URI through the
         // document's URI.
-        print(Saf().writeFileStream);
+        debugPrint("SAF status: ${Saf().writeFileStream}");
 
         title = newTitle;
 
-        print("Imported file updated successfully.");
-        print("Final URI: $path");
+        debugPrint("Imported file updated successfully.");
+        debugPrint("Final URI: $path");
 
         return;
       }
 
 
-      final newPath = '$path/$newTitle.txt';
+      // Determine the directory
+      String directoryPath;
+      if (await Directory(path).exists()) {
+        directoryPath = path;
+      } else {
+        directoryPath = p.dirname(path);
+      }
 
-      print("NewPath: $newPath");
+      final newPath = p.join(directoryPath, '$newTitle.txt');
+
+      debugPrint("NewPath: $newPath");
 
       // Rename an existing Texnote file
       if (oldTitle.isNotEmpty && newTitle != oldTitle) {
-        print("Title has changed");
+        debugPrint("Title has changed");
 
-        final oldPath = '$path/$oldTitle.txt';
+        final oldPath = p.join(directoryPath, '$oldTitle.txt');
         final oldFile = File(oldPath);
 
         if (await oldFile.exists()) {
           await oldFile.delete();
-          print("$oldPath deleted!");
+          debugPrint("$oldPath deleted!");
         }
       }
 
@@ -137,10 +138,12 @@ class Note {
       await file.writeAsString(body);
 
       title = newTitle;
+      path = file.path;
+      date = DateTime.now();
 
-      print("Saved: ${file.path}");
+      debugPrint("Saved: ${file.path}");
     } catch (e) {
-      print("Error saving note: $e");
+      debugPrint("Error saving note: $e");
     }
   }
 
@@ -151,26 +154,31 @@ class Note {
 
   Future<void> deleteNote() async {
     final file = File(path);
-    print(path);
+    debugPrint("Deleting file at path: $path");
 
     if (await file.exists()) {
       await file.delete();
-      print(path + " deleted!");
+      debugPrint("$path deleted!");
     }
   }
 
   Future<void> duplicate_note( Future<void> Function() onNoteCreated ) async {
     try {
-      String newPath = path.replaceFirst(".txt", "-Copy.txt");
+      String newPath;
+      if (path.endsWith('.txt')) {
+        newPath = path.replaceFirst(".txt", "-Copy.txt");
+      } else {
+        newPath = p.join(path, "${sanitizeFileName(title)}-Copy.txt");
+      }
 
-      print("NEW PATH:  $newPath");
+      debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
       await file.writeAsString(body);
       await onNoteCreated();
 
     }
     catch (e) {
-      print("Error saving note: $e");
+      debugPrint("Error duplicating note: $e");
     }
   }
 

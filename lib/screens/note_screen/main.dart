@@ -31,12 +31,12 @@ class _NoteScreenState extends State<NoteScreen> {
   @override
   void initState() {
     super.initState();
-    titleController = TextEditingController(text: widget.note.title ?? "",);
-    bodyController = TextEditingController(text: widget.note.body ?? "",);
-    markdownData = widget.note.body ?? "";
+    titleController = TextEditingController(text: widget.note.title,);
+    bodyController = TextEditingController(text: widget.note.body,);
+    markdownData = widget.note.body;
     titleController.addListener(_markChanged);
     bodyController.addListener(_markChanged);
-    old_title = widget.note.title ?? "";
+    old_title = widget.note.title;
     _autoSaveTimer = Timer.periodic( const Duration(minutes: 1), (_) => save(),);
 
   }
@@ -69,10 +69,11 @@ class _NoteScreenState extends State<NoteScreen> {
     });
   }
   Future<void> save() async {
-    if (!changed) {debugPrint("Save skipped: no changes");return;}
+    if (!changed && titleController.text != "") {debugPrint("Save skipped: no changes");return;}
     debugPrint("Saving...");
     widget.note.title = titleController.text;
     widget.note.body = bodyController.text;
+    widget.note.title = (widget.note.title == "") ? DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now()) : widget.note.title;
 
     await widget.note.saveNote(_currentTime, old_title,);
     if (!mounted) return;

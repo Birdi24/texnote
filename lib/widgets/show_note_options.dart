@@ -5,8 +5,75 @@ import 'package:intl/intl.dart';
 import '../app_style.dart';
 import '../models/favorite_and_collection_handling.dart';
 import '../models/note.dart';
-import '../screens/home_screen/notes_view.dart';
 import 'glass_container.dart';
+
+Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, void Function(Note) onNoteDeleted) {
+  final screen_width = MediaQuery.of(context).size.width;
+  return showDialog<bool>(
+      barrierColor: Colors.transparent,
+      context: context,
+      builder: (context) {
+        return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: glassContainer(
+              bgAlpha: 10,
+              borderAlpha: 244,
+              borderColor: Colors.red,
+              height: 278,
+              width: screen_width > 420 ? 370 : screen_width - 50,
+              shadowColor: BG,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      const SizedBox(height: 45),
+                      const Text(
+                        "Delete note?",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Text(
+                        textAlign: TextAlign.center,
+                        'Are you sure you want to delete\n"${notes[index].title}"?',
+                      ),
+
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: icon_color),),
+                          ),
+
+                          const SizedBox(width: 15),
+
+                          ElevatedButton(
+                            onPressed: () async{
+                              Note noteToDelete = notes[index];
+                              Navigator.pop(context);
+                              await noteToDelete.deleteNote();
+                              onNoteDeleted(noteToDelete);
+                            },
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    ]
+                ),
+              ),)
+        );
+      }
+  );
+}
 
 void show_note_options(BuildContext context, List<Note> notes,int index, collections, Future<void> Function() onNoteChanged , void Function(Note) onNoteDeleted, void Function(Note) add_to_favorites) {
   double screen_width =  MediaQuery.of(context).size.width;
@@ -355,9 +422,10 @@ void rename_note(
                     ElevatedButton(
                       onPressed: () async {
                         final newTitle = controller.text.trim();
-
+                        debugPrint(newTitle);
                         if (newTitle.isEmpty) return;
                         final oldTitle = notes[index].title;
+                        notes[index].title = newTitle;
                         notes[index].saveNote(DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now()), oldTitle);
                         await onNoteCreated();
 

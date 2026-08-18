@@ -1,50 +1,60 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
-import 'dart:io';
+
 import 'package:texnote/models/favorite_and_collection_handling.dart';
+import 'package:texnote/models/note.dart';
+import 'package:texnote/models/favorite_and_collection_handling.dart';
+
+import 'package:texnote/screens/home_screen/home_body.dart';
 import 'package:texnote/screens/home_screen/home_nav_bar.dart';
 import 'package:texnote/screens/home_screen/home_top_bar.dart';
-import 'package:texnote/widgets/glass_container.dart';
 
 import '../../app_style.dart';
-import '../../models/note.dart';
-import 'collections_view.dart';
-import 'no_collections_view.dart';
-import 'package:path_provider/path_provider.dart';
-import 'no_notes_view.dart';
-import 'notes_view.dart';
-class HomeScreen extends StatefulWidget   {
-  const HomeScreen({super.key});
+import '../../widgets/glass_container.dart';
 
-  Future<void> onNoteChanged() async {}
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver {
   List<Note> notes = [];
   List<Collection> collections = [];
-  Collection? _selectedCollection;
   List<Note> favorites = [];
+
+  Collection? _selectedCollection;
+
   bool _isSearching = false;
   bool _inCollection = false;
-  final TextEditingController _searchController = TextEditingController();
+
+  final TextEditingController _searchController =
+  TextEditingController();
+
   String _searchQuery = '';
 
   int sort = 0;
   int control = 1;
 
-  final PageController _pageController = PageController(initialPage: 1);
+  final PageController _pageController =
+  PageController(initialPage: 1);
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
+        _searchQuery =
+            _searchController.text.toLowerCase();
       });
     });
-    WidgetsBinding.instance.addObserver(this);
+
     init_files();
   }
 
@@ -56,53 +66,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  void openCollection(Collection collection) {
-    setState(() {
-      _inCollection = true;
-      _selectedCollection = collection;
-    });
-  }
-  void closeCollection() {
-    debugPrint("Collection closed");
-    setState(() {
-      _inCollection = false;
-      _selectedCollection = null;
-    });
-  }
+  // ---------------------------------------------------------------------------
+  // DATA
+  // ---------------------------------------------------------------------------
 
   Future<void> init_files() async {
-    var savedNotes = await Note.collectNotes();
-    collections = await load_collections();
-    debugPrint("Collections found: ${collections.length} ");
-    favorites = await load_favorites(savedNotes);
-    debugPrint("Favorites found: ${favorites.length}");
+    final savedNotes = await Note.collectNotes();
+    final savedCollections = await load_collections();
+    final savedFavorites = await load_favorites(savedNotes);
 
     setState(() {
       notes = savedNotes;
+      collections = savedCollections;
+      favorites = savedFavorites;
     });
-  }
-
-  List<Note> get displayedNotes {
-    List<Note> result = notes;
-
-    if (control == 2) {result = favorites;}
-
-    // Apply search
-    if (_searchQuery.isNotEmpty) {
-      result = result.where((note) {
-        return note.title.toLowerCase().contains(_searchQuery) ||
-            note.body.toLowerCase().contains(_searchQuery);
-      }).toList();
-    }
-
-    return result;
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      saveAppState();
-    }
   }
 
   Future<void> saveAppState() async {
@@ -112,20 +89,75 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ]);
   }
 
+  // ---------------------------------------------------------------------------
+  // DISPLAYED NOTES
+  // ---------------------------------------------------------------------------
 
-  void add_or_remove_favorite(note) {
-    if (!favorites.contains(note)) {favorites.add(note); note.is_fav =true;}
-    else  {favorites.remove(note); note.is_fav =false;}
+  List<Note> get displayedNotes {
+    List<Note> result;
+
+    if (control == 2) {
+      result = favorites;
+    } else if (_inCollection && _selectedCollection != null) {
+      result = _selectedCollection!.notes;
+    } else {
+      result = notes;
+    }
+
+    if (_searchQuery.isEmpty) {
+      return result;
+    }
+
+    return result.where((note) {
+      return note.title
+          .toLowerCase()
+          .contains(_searchQuery) ||
+          note.body
+              .toLowerCase()
+              .contains(_searchQuery);
+    }).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // COLLECTIONS
+  // ---------------------------------------------------------------------------
+
+  void openCollection(Collection collection) {
     setState(() {
-      favorites = favorites;
+      _selectedCollection = collection;
+      _inCollection = true;
     });
+  }
+
+  void closeCollection() {
+    setState(() {
+      _selectedCollection = null;
+      _inCollection = false;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // NOTES
+  // ---------------------------------------------------------------------------
+
+  void add_or_remove_favorite(Note note) {
+    if (favorites.contains(note)) {
+      favorites.remove(note);
+      note.is_fav = false;
+    } else {
+      favorites.add(note);
+      note.is_fav = true;
+    }
+
+    setState(() {});
   }
 
   void onNoteDeleted(Note note) {
     setState(() {
       notes.remove(note);
       favorites.remove(note);
-      for (var collection in collections) {
+
+      for (final collection in collections) {
         collection.notes.remove(note);
       }
     });
@@ -134,24 +166,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> onNoteChanged() async {
     await saveAppState();
     refresh();
-    debugPrint("New State Set after note change");
   }
 
-  Future<void> onControlChanged(int n_control) async {
-    int abs_change = (n_control -control).abs();
+  // ---------------------------------------------------------------------------
+  // CONTROLS
+  // ---------------------------------------------------------------------------
+
+  Future<void> onControlChanged(int newControl) async {
+    final difference = (newControl - control).abs();
 
     setState(() {
-      control = n_control;
+      control = newControl;
     });
 
     if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        n_control,
-        duration: Duration(milliseconds: 320 * abs_change),
+      await _pageController.animateToPage(
+        newControl,
+        duration: Duration(
+          milliseconds: 320 * difference,
+        ),
         curve: Curves.easeInOut,
       );
     }
-
   }
 
   void onSearchChanged() {
@@ -166,61 +202,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> onSortChanged() async {
     sort = (sort + 1) % 3;
-    debugPrint("Sort state changed to: $sort");
     refresh();
-    debugPrint("New State Set after sort change");
   }
 
-  void refresh(){
+  void refresh() {
     switch (control) {
-      case 0: {
-        List<Collection> newCollections = Collection.sort_collections(collections, sort);
-        setState(() {collections = newCollections;});
-        for (Collection collection in collections) {
-          debugPrint("Collection Name: ${collection.title}");
-          debugPrint("Collection Color: ${collection.color}");
-          debugPrint("Notes paths:");
-          for (var note in collection.notes) {
-            if (note is String) {
-              debugPrint(" - $note");
-            } else if (note is Note) {
-              debugPrint(" - ${note.path}");
-            }
-          }
-        }
-      }
-      case 1 : {
-        List<Note> new_notes = Note.sort_notes(notes, sort);
-        setState(() {notes = new_notes; });
-        debugPrint("Notes paths:");
-        for (var note in notes) {
-          debugPrint(" - ${note.path}");
-        }
-      }
-      case 2 : {
-        List<Note> new_fav = Note.sort_notes(favorites, sort);
-        setState(() {favorites = new_fav;});
-        debugPrint("Favorites paths:");
-        for (var note in favorites) {
-          debugPrint(" - ${note.path}");
-        }
-      }
+      case 0:
+        setState(() {
+          collections =
+              Collection.sort_collections(collections, sort);
+        });
+        break;
+
+      case 1:
+        setState(() {
+          notes = Note.sort_notes(notes, sort);
+        });
+        break;
+
+      case 2:
+        setState(() {
+          favorites =
+              Note.sort_notes(favorites, sort);
+        });
+        break;
     }
-    getApplicationDocumentsDirectory().then((Directory directory) {
-      debugPrint("Files in App Directory (${directory.path}):");
-      directory.list(recursive: true, followLinks: false)
-          .listen((FileSystemEntity entity) {
-        debugPrint(" - ${entity.path}");
-      });
-    }).catchError((e) {
-      debugPrint("Error listing files: $e");
-    });
   }
+
+  // ---------------------------------------------------------------------------
+  // APP LIFECYCLE
+  // ---------------------------------------------------------------------------
+
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    if (state == AppLifecycleState.paused) {
+      saveAppState();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    debugPrint("HomeScreen building");
-    double screen_width = MediaQuery.of(context).size.width;
+    final screenWidth =
+        MediaQuery.of(context).size.width;
 
     return PopScope(
       canPop: !_inCollection,
@@ -235,76 +264,166 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         body: SafeArea(
           child: Stack(
             children: [
+              // ----------------------------------------------------------------
+              // MAIN CONTENT
+              // ----------------------------------------------------------------
 
-              // NOTES AREA
-              Positioned(top: 40, left: 0, right: 0, bottom: 0,
-
+              Positioned(
+                top: 40,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: PageView(
                   controller: _pageController,
 
-                  onPageChanged: (index) {setState(() {control = index;});},
+                  onPageChanged: (index) {
+                    setState(() {
+                      control = index;
+                    });
+                  },
 
                   children: [
+                    home_body(
+                      control: 0,
+                      context: context,
+                      notes: notes,
+                      displayedNotes: displayedNotes,
+                      collections: collections,
+                      onNoteChanged: onNoteChanged,
+                      onNoteDeleted: onNoteDeleted,
+                      addToFavorites:
+                      add_or_remove_favorite,
+                      selectedCollection:
+                      _selectedCollection,
+                      inCollection: _inCollection,
+                      openCollection: openCollection
+                    ),
 
-                    // 0 = COLLECTIONS
-                    _inCollection
-                        ? notes_view(context, _selectedCollection!.notes,collections, onNoteChanged, onNoteDeleted, add_or_remove_favorite,)
-                        : collections.isEmpty
-                        ? no_collections_view(context, onNoteChanged, collections, notes,control,add_or_remove_favorite,_selectedCollection)
-                        : collections_view(context, collections, onNoteChanged, add_or_remove_favorite, openCollection,),
-                    // 1 = ALL
-                    displayedNotes.isEmpty
-                        ? no_note_view(context, onNoteChanged,collections, notes,control,add_or_remove_favorite,_selectedCollection)
-                        : notes_view(context, displayedNotes, collections,onNoteChanged, onNoteDeleted, add_or_remove_favorite),
+                    home_body(
+                      control: 1,
+                      context: context,
+                      notes: notes,
+                      displayedNotes: displayedNotes,
+                      collections: collections,
+                      onNoteChanged: onNoteChanged,
+                      onNoteDeleted: onNoteDeleted,
+                      addToFavorites:
+                      add_or_remove_favorite,
+                      selectedCollection:
+                      _selectedCollection,
+                      inCollection: _inCollection,
+                      openCollection: openCollection
+                    ),
 
-                    // 2 = FAVORITES
-                    displayedNotes.isEmpty
-                        ? no_note_view(context, onNoteChanged, collections, notes,control,add_or_remove_favorite,_selectedCollection)
-                        : notes_view(context, displayedNotes, collections,onNoteChanged, onNoteDeleted, add_or_remove_favorite),
+                    home_body(
+                      control: 2,
+                      context: context,
+                      notes: notes,
+                      displayedNotes: displayedNotes,
+                      collections: collections,
+                      onNoteChanged: onNoteChanged,
+                      onNoteDeleted: onNoteDeleted,
+                      addToFavorites:
+                      add_or_remove_favorite,
+                      selectedCollection:
+                      _selectedCollection,
+                      inCollection: _inCollection,
+                      openCollection: openCollection
+                    ),
                   ],
                 ),
               ),
+
+              // ----------------------------------------------------------------
+              // BACKGROUND
+              // ----------------------------------------------------------------
+
               bg_gradient(),
-              top_right_button_cluster(onNoteChanged, onSortChanged, context, screen_width, onSearchChanged, _isSearching),
 
-              top_left_cluster(control, _selectedCollection, closeCollection, context, screen_width),
+              // ----------------------------------------------------------------
+              // TOP RIGHT
+              // ----------------------------------------------------------------
 
-              _isSearching ?
-              Positioned(
-                  bottom:10, left: 15, right :15,
+              top_right_button_cluster(
+                onNoteChanged,
+                onSortChanged,
+                context,
+                screenWidth,
+                onSearchChanged,
+                _isSearching,
+              ),
+
+              // ----------------------------------------------------------------
+              // TOP LEFT
+              // ----------------------------------------------------------------
+
+              top_left_cluster(
+                control,
+                _selectedCollection,
+                closeCollection,
+                context,
+                screenWidth,
+              ),
+
+              // ----------------------------------------------------------------
+              // SEARCH
+              // ----------------------------------------------------------------
+
+              if (_isSearching)
+                Positioned(
+                  bottom: 10,
+                  left: 15,
+                  right: 15,
                   child: glassContainer(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        top: 12,
+                        left: 10,
+                        right: 10,
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder:
+                          InputBorder.none,
+                          focusedBorder:
+                          InputBorder.none,
+                          hintText: 'Search notes...',
+                          prefixIcon:
+                          const Icon(Icons.search),
+                          suffixIcon: IconButton(
+                            icon:
+                            const Icon(Icons.clear),
+                            onPressed:
+                            onSearchChanged,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
-                      child: Padding(
-                          padding: EdgeInsetsGeometry.only(top: 12, left: 10, right: 10,),
-                          child: TextField(
-                            controller: _searchController,
-                            autofocus: true,
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              hintText: 'Search notes...',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  onSearchChanged();
-                                },
-                              ),
-                            ),
-                          )
-                      )
-                  )
-              ):
+              // ----------------------------------------------------------------
+              // NAVIGATION
+              // ----------------------------------------------------------------
 
-              home_nav_bar(onNoteChanged, context, screen_width, control, onControlChanged, collections,notes,add_or_remove_favorite,_selectedCollection),
+              home_nav_bar(
+                onNoteChanged,
+                context,
+                screenWidth,
+                control,
+                onControlChanged,
+                collections,
+                notes,
+                add_or_remove_favorite,
+                _selectedCollection,
+              ),
             ],
           ),
         ),
-      )
+      ),
     );
-
-
-
   }
 }

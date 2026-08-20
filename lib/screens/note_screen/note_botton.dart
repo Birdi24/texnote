@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../app_style.dart';
 import 'note_body_helper_functions.dart';
-Widget note_bottom(String currentTime,_lastSaved, TextEditingController bodyController) {
+Widget note_bottom(String currentTime, TextEditingController bodyController) {
   return ValueListenableBuilder<TextEditingValue>(
     valueListenable: bodyController,
     builder: (context, value, child) {
@@ -42,10 +42,6 @@ Widget note_bottom(String currentTime,_lastSaved, TextEditingController bodyCont
                 'Opened $currentTime',
                 style: AppStyles.timefont,
               ),
-              const SizedBox(width: 20),
-              _lastSaved != null
-                  ? Text('Last saved $_lastSaved', style: AppStyles.timefont,)
-                  : Text('Note not saved', style: AppStyles.timefont,),
             ],
           ),
         ),

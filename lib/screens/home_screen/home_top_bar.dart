@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../app_style.dart';
 import '../../widgets/single_circle_button.dart';
-import 'home_nav_bar.dart';
 
 Widget title(int control, _selectedCollection) {
   final text_src = ["Collections", "All Notes", "Favorites"];
@@ -55,7 +54,7 @@ Widget bg_gradient(){
   );
 }
 
-Widget top_right_button_cluster(Function() onNoteChanged, Function() onSortChanged, context, screen_width, Function() onSearchChanged, bool _isSearching) {
+Widget top_right_button_cluster(control, _inCollection,Function() onNoteChanged, Function() onSortChanged, context, screen_width, Function() onSearchChanged, bool _isSearching) {
   return
 
     Positioned(
@@ -67,7 +66,7 @@ Widget top_right_button_cluster(Function() onNoteChanged, Function() onSortChang
           child: Row(
               spacing: 8,
               children: [
-                single_circle_button(Icons.search, 20.0,90, "Sort", onSearchChanged, context, screen_width, button_width: 45.0 ),
+                (control != 0 || _inCollection) ? single_circle_button(Icons.search, 20.0,90, "Search", onSearchChanged, context, screen_width, button_width: 45.0 ) : SizedBox.shrink(),
                 single_circle_button(Icons.sort_sharp, 20.0,90, "Sort", onSortChanged, context, screen_width, button_width: 45.0 ),
                 single_circle_button(Icons.more_horiz, 20.0,90, "settings", onNoteChanged, context, screen_width, button_width: 45.0 ),
               ]

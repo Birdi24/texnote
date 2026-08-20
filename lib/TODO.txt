@@ -1,3 +1,27 @@
+
+Note management:
+Move notes between collections
+
+Collections:
+Rename collections
+Delete collections
+Move notes between collections
+
+Editor improvements:
 Keyboard shortcut hints (Ctrl+S, Ctrl+Z, etc., especially on desktop)
 Search within note (Ctrl+F)
 Distraction-free/fullscreen editor
+Undo/redo
+More formatting tools
+Keyboard shortcuts
+Recover from malformed/unreadable files
+
+Nice to have:
+Tags
+Pinned notes
+Note colors
+Recently edited
+Trash/recycle bin
+Import/export
+Settings
+Themes

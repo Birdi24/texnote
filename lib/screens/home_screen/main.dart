@@ -1,21 +1,18 @@
-import 'dart:ffi';
-
 import 'package:flutter/material.dart';
-
-import 'package:texnote/models/favorite_and_collection_handling.dart';
-import 'package:texnote/models/note.dart';
-import 'package:texnote/models/favorite_and_collection_handling.dart';
-
+import 'package:texnote/models/TextNote.dart';
+import 'package:texnote/models/collections.dart';
 import 'package:texnote/screens/home_screen/home_body.dart';
 import 'package:texnote/screens/home_screen/home_nav_bar.dart';
 import 'package:texnote/screens/home_screen/home_top_bar.dart';
 
 import '../../app_style.dart';
+import '../../io/browse_file.dart';
+import '../../models/Note.dart';
+import '../../models/favorites.dart';
 import '../../widgets/glass_container.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -71,8 +68,8 @@ class _HomeScreenState extends State<HomeScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> init_files() async {
-    final savedNotes = await Note.collectNotes();
-    final savedCollections = await load_collections();
+    final savedNotes = await collect();
+    final savedCollections = await Collection.load_collections(savedNotes);
     final savedFavorites = await load_favorites(savedNotes);
 
     setState(() {
@@ -84,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> saveAppState() async {
     await Future.wait([
-      save_collections(collections),
+      Collection.save_collections(collections),
       save_favorites(notes),
     ]);
   }
@@ -95,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   List<Note> get displayedNotes {
     List<Note> result;
-
     if (control == 2) {
       result = favorites;
     } else if (_inCollection && _selectedCollection != null) {
@@ -109,12 +105,17 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return result.where((note) {
+      if (note.type == TextNote) {
+        return note.title
+            .toLowerCase()
+            .contains(_searchQuery) ||
+            (note as TextNote).body
+            .toLowerCase()
+            .contains(_searchQuery);
+      }
       return note.title
           .toLowerCase()
-          .contains(_searchQuery) ||
-          note.body
-              .toLowerCase()
-              .contains(_searchQuery);
+          .contains(_searchQuery);
     }).toList();
   }
 
@@ -143,10 +144,10 @@ class _HomeScreenState extends State<HomeScreen>
   void add_or_remove_favorite(Note note) {
     if (favorites.contains(note)) {
       favorites.remove(note);
-      note.is_fav = false;
+      note.isFavorite = false;
     } else {
       favorites.add(note);
-      note.is_fav = true;
+      note.isFavorite = true;
     }
 
     setState(() {});
@@ -197,6 +198,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (!_isSearching) {
         _searchController.clear();
       }
+      else {control = 1;}
     });
   }
 
@@ -345,6 +347,8 @@ class _HomeScreenState extends State<HomeScreen>
               // ----------------------------------------------------------------
 
               top_right_button_cluster(
+                control,
+                _inCollection,
                 onNoteChanged,
                 onSortChanged,
                 context,
@@ -369,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen>
               // SEARCH
               // ----------------------------------------------------------------
 
-              if (_isSearching)
+              _isSearching ?
                 Positioned(
                   bottom: 10,
                   left: 15,
@@ -403,13 +407,8 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                   ),
-                ),
-
-              // ----------------------------------------------------------------
-              // NAVIGATION
-              // ----------------------------------------------------------------
-
-              home_nav_bar(
+                )
+              : home_nav_bar(
                 onNoteChanged,
                 context,
                 screenWidth,

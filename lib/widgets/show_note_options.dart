@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../app_style.dart';
-import '../models/favorite_and_collection_handling.dart';
-import '../models/note.dart';
+import '../models/Note.dart';
+import '../models/collections.dart';
+import '../models/TextNote.dart';
 import 'glass_container.dart';
+import 'on_new_collection.dart';
 
 Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, void Function(Note) onNoteDeleted) {
   final screen_width = MediaQuery.of(context).size.width;
@@ -60,7 +62,7 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
                             onPressed: () async{
                               Note noteToDelete = notes[index];
                               Navigator.pop(context);
-                              await noteToDelete.deleteNote();
+                              await noteToDelete.delete();
                               onNoteDeleted(noteToDelete);
                             },
                             child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -107,8 +109,8 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                     ),
 
                     ListTile(
-                      leading: Icon(Icons.star_outline ,color:  notes[index].is_fav? Colors.red : icon_color),
-                      title: notes[index].is_fav? Text('Remove from favorites' ,style: TextStyle(color: Colors.red),) : Text('Add to favorites'),
+                      leading: Icon(Icons.star_outline ,color:  notes[index].isFavorite? Colors.red : icon_color),
+                      title: notes[index].isFavorite? Text('Remove from favorites' ,style: TextStyle(color: Colors.red),) : Text('Add to favorites'),
                       onTap: () {
                         Navigator.pop(context);
                         add_to_favorites(notes[index]);
@@ -130,21 +132,24 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                       onTap: () {
                         Navigator.pop(context);
 
+                        if (collections.isEmpty) {
+                          on_new_collection(
+                            context,
+                            collections,
+                            onNoteChanged, false
+                          );
+                          return;
+                        }
+
                         showDialog<bool>(
                           barrierColor: Colors.transparent,
                           context: context,
                           builder: (context) {
                             String? selectedCollection;
-                            String selectedColor = "1";
-                            final collectionController = TextEditingController();
 
                             return StatefulBuilder(
                               builder: (context, dialogSetState) {
-                                final bool creatingNewCollection = collections.isEmpty;
-
-                                final bool canSubmit = creatingNewCollection
-                                    ? collectionController.text.trim().isNotEmpty
-                                    : selectedCollection != null;
+                                final canSubmit = selectedCollection != null;
 
                                 return Dialog(
                                   backgroundColor: Colors.transparent,
@@ -153,99 +158,46 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                                     bgAlpha: 10,
                                     borderAlpha: 244,
                                     borderColor: icon_color,
-                                    height: 278,
-                                    width: screen_width > 420
-                                        ? 370
-                                        : screen_width - 50,
+                                    height: 230,
+                                    width: screen_width > 420 ? 370 : screen_width - 50,
                                     shadowColor: BG,
                                     child: Padding(
                                       padding: const EdgeInsets.all(24),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-
-                                          SizedBox(height: creatingNewCollection ? 20 : 45),
+                                          const SizedBox(height: 25),
 
                                           const Text(
-                                            "Add to Collection?",
+                                            "Add to Collection",
                                             style: TextStyle(
                                               fontSize: 22,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
 
-                                          const SizedBox(height: 20),
+                                          const SizedBox(height: 25),
 
-                                          if (creatingNewCollection) ...[
-                                            TextField(
-                                              controller: collectionController,
-                                              decoration: const InputDecoration(
-                                                hintText: "Collection name",
-                                              ),
-                                              onChanged: (_) {
-                                                dialogSetState(() {});
-                                              },
-                                            ),
-
-                                            const SizedBox(height: 20),
-
-                                            Row(
-                                              mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                              children: List.generate(6, (index) {
-                                                final color = '${index + 1}';
-                                                final selected =
-                                                    selectedColor == color;
-
-                                                return GestureDetector(
-                                                  onTap: () {
-                                                    dialogSetState(() {
-                                                      selectedColor = color;
-                                                    });
-                                                  },
-                                                  child: Container(
-                                                    width: 35,
-                                                    height: 35,
-                                                    decoration: BoxDecoration(
-                                                      color: collection_color(color),
-                                                      borderRadius:
-                                                      BorderRadius.circular(8),
-                                                      border: Border.all(
-                                                        color: selected
-                                                            ? icon_color
-                                                            : Colors.transparent,
-                                                        width: 3,
-                                                      ),
-                                                    ),
-                                                  ),
+                                          DropdownButton<String>(
+                                            isExpanded: true,
+                                            value: selectedCollection,
+                                            hint: const Text("Select a collection"),
+                                            items: collections.map<DropdownMenuItem<String>>(
+                                                  (collection) {
+                                                return DropdownMenuItem<String>(
+                                                  value: collection.title,
+                                                  child: Text(collection.title),
                                                 );
-                                              }),
-                                            ),
-                                          ] else ...[
-                                            DropdownButton<String>(
-                                              isExpanded: true,
-                                              value: selectedCollection,
-                                              hint: const Text(
-                                                "Select a collection",
-                                              ),
-                                              items: collections
-                                                  .map<DropdownMenuItem<String>>(
-                                                    (collection) {
-                                                  return DropdownMenuItem<String>(
-                                                    value: collection.title,
-                                                    child: Text(collection.title),
-                                                  );
-                                                },
-                                              ).toList(),
-                                              onChanged: (value) {
-                                                dialogSetState(() {
-                                                  selectedCollection = value;
-                                                });
                                               },
-                                            ),
-                                          ],
+                                            ).toList(),
+                                            onChanged: (value) {
+                                              dialogSetState(() {
+                                                selectedCollection = value;
+                                              });
+                                            },
+                                          ),
 
-                                          const SizedBox(height: 20),
+                                          const SizedBox(height: 25),
 
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.center,
@@ -268,33 +220,18 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                                                 onPressed: !canSubmit
                                                     ? null
                                                     : () {
-                                                  if (creatingNewCollection) {
-                                                    final title =
-                                                    collectionController
-                                                        .text
-                                                        .trim();
+                                                  final collection =
+                                                  collections.firstWhere(
+                                                        (c) =>
+                                                    c.title == selectedCollection,
+                                                  );
 
-                                                    collections.add(
-                                                      Collection(
-                                                        title,
-                                                        selectedColor,
-                                                        [notes[index]],
-                                                      ),
-                                                    );
-                                                  } else {
-                                                    final collection =
-                                                    collections.firstWhere(
-                                                          (c) =>
-                                                      c.title ==
-                                                          selectedCollection,
-                                                    );
-
-                                                    if (!collection.notes
-                                                        .contains(notes[index])) {
-                                                      collection.notes
-                                                          .add(notes[index]);
-                                                    }
+                                                  if (!collection.notes
+                                                      .contains(notes[index])) {
+                                                    collection.notes.add(notes[index]);
                                                   }
+
+                                                  onNoteChanged();
 
                                                   Navigator.pop(context);
                                                 },
@@ -426,7 +363,7 @@ void rename_note(
                         if (newTitle.isEmpty) return;
                         final oldTitle = notes[index].title;
                         notes[index].title = newTitle;
-                        notes[index].saveNote(DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now()), oldTitle);
+                        notes[index].save(oldTitle);
                         await onNoteCreated();
 
                         Navigator.pop(context);

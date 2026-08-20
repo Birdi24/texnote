@@ -1,135 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../app_style.dart';
-import '../../models/favorite_and_collection_handling.dart';
-import '../../models/note.dart';
+import '../../models/Note.dart';
+import '../../models/collections.dart';
+import '../../models/TextNote.dart';
 import '../../widgets/show_note_options.dart';
 import '../note_screen/main.dart';
 
 import 'no_collections_view.dart';
 import 'no_notes_view.dart';
-
-
-// =============================================================================
-// NOTE DISPLAY
-// =============================================================================
-
-Widget display_note(Note note) {
-  return Column(
-    children: [
-      Container(
-        width: 180,
-        height: 250,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: icon_color,
-            width: 1,
-          ),
-        ),
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: Text(
-            note.body,
-            maxLines: 10,
-            overflow: TextOverflow.fade,
-            style: const TextStyle(
-              color: icon_color,
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ),
-
-      const SizedBox(height: 8),
-
-      Text(
-        note.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: icon_color,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-
-      const SizedBox(height: 3),
-
-      Text(
-        note.date_string(),
-        style: TextStyle(
-          color: Colors.black.withAlpha(60),
-          fontSize: 12,
-        ),
-      ),
-    ],
-  );
-}
-
-
-// =============================================================================
-// COLLECTION DISPLAY
-// =============================================================================
-
-Widget display_collection(Collection collection) {
-  return Column(
-    children: [
-      Container(
-        width: 180,
-        height: 250,
-        padding: const EdgeInsets.only(top: 50),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: collection_color(collection.color),
-          border: Border.all(
-            color: icon_color,
-            width: 2,
-          ),
-        ),
-        child: Container(
-          alignment: Alignment.bottomCenter,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(
-              color: icon_color,
-              width: 2,
-            ),
-          ),
-        ),
-      ),
-
-      const SizedBox(height: 8),
-
-      Text(
-        collection.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-
-      const SizedBox(height: 3),
-
-      Text(
-        "${collection.notes.length} Notes",
-        style: TextStyle(
-          color: Colors.black.withAlpha(60),
-          fontSize: 12,
-        ),
-      ),
-    ],
-  );
-}
-
 
 // =============================================================================
 // NOTE CARD
@@ -162,16 +41,18 @@ Widget note_card({
     onDoubleTap: showOptions,
 
     onTap: () async {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => NoteScreen(note),
-        ),
-      );
+      if (note.type == TextNote) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TextNoteScreen(note as TextNote),
+          ),
+        );
+      }
       await onNoteChanged();
     },
 
-    child: display_note(note),
+    child: note.display(),
   );
 }
 
@@ -198,7 +79,7 @@ Widget collection_card({
       openCollection(collection);
     },
 
-    child: display_collection(collection),
+    child: collection.display(),
   );
 }
 
@@ -291,10 +172,6 @@ Widget home_body({
       }).toList(),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // NOTES / FAVORITES / COLLECTION NOTES
-  // ---------------------------------------------------------------------------
 
   if (displayedNotes.isEmpty) {
     return no_note_view(

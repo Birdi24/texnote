@@ -6,7 +6,8 @@ import '../../widgets/browse_file_button.dart';
 import '../../widgets/new_file_button.dart';
 
 Widget no_collections_view(context, Future<void> Function() onNoteChanged,collections,notes, control,add_or_remove_favorite,selected_collection) {
-  return Center(
+  return Align(
+    alignment: AlignmentGeometry.center,
     child: GestureDetector(
       onTap: () {
         new_note_button(context, onNoteChanged, collections, notes, control, add_or_remove_favorite, selected_collection, true);

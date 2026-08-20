@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:texnote/widgets/glass_container.dart';
 import '../app_style.dart';
 import '../io/browse_file.dart';
-import '../models/note.dart';
+import '../models/Note.dart';
+import '../models/TextNote.dart';
 import '../screens/note_screen/main.dart';
 
 Widget browse_button(context,  Future<void> Function() onNoteCreated) {
@@ -11,11 +12,10 @@ Widget browse_button(context,  Future<void> Function() onNoteCreated) {
     onTap: () async {
       print("browsing files to open");
       Note? note = await FileOpenerScreen().browseFiles();
-      if (note != null ) {
-        print("\npath: "+ note.path);
-        print("\ntitle:" + note.title);
+      if (note != null && note.type == TextNote) {
+
         await Navigator.push(context,
-            MaterialPageRoute(builder: (context) => NoteScreen(note))
+            MaterialPageRoute(builder: (context) => TextNoteScreen(note as TextNote))
         );
       }
       await onNoteCreated();

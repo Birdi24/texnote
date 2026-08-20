@@ -2,21 +2,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
-import '../../models/note.dart';
+import '../../models/TextNote.dart';
 import 'note_body.dart';
 import 'note_botton.dart';
 import 'note_top.dart';
 
-class NoteScreen extends StatefulWidget {
-  Note note;
+class TextNoteScreen extends StatefulWidget {
+  TextNote note;
   
-  NoteScreen(this.note);
+  TextNoteScreen(this.note);
 
   @override
-  State<NoteScreen> createState() => _NoteScreenState();
+  State<TextNoteScreen> createState() => _TextNoteScreenState();
 }
 
-class _NoteScreenState extends State<NoteScreen> {
+class _TextNoteScreenState extends State<TextNoteScreen> {
   Timer? _autoSaveTimer;
   var titleController = TextEditingController();
   var bodyController = TextEditingController();
@@ -73,9 +73,9 @@ class _NoteScreenState extends State<NoteScreen> {
     debugPrint("Saving...");
     widget.note.title = titleController.text;
     widget.note.body = bodyController.text;
-    widget.note.title = (widget.note.title == "") ? DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now()) : widget.note.title;
+    widget.note.title = (widget.note.title == "") ? DateFormat('MMM d, yyyy - h:mm:ss a').format(DateTime.now()) : widget.note.title;
 
-    await widget.note.saveNote(_currentTime, old_title,);
+    await widget.note.save(old_title,);
     if (!mounted) return;
     setState(() {
       changed = false;_lastSaved = DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now());
@@ -120,7 +120,7 @@ class _NoteScreenState extends State<NoteScreen> {
 
                 const SizedBox(height: 10),
                 Expanded( child: note_body(context, bodyController,font_size, markdown_enabled,markdownkey, markdownData)),
-                note_bottom(_currentTime, _lastSaved, bodyController),
+                note_bottom(_currentTime, bodyController),
               ],
             ),
           ),

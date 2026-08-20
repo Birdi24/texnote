@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 const BG =  Colors.white;
 const text = Colors.black;
-const dividers = Color.fromRGBO(253, 240, 213, 1.0);
 const icon_color = Colors.black;
 const accent = Colors.black12;
 
@@ -67,7 +66,7 @@ class AppStyles {
       fontSize: 14.0,
       color: Colors.red
   );
-  static TextStyle timefont = GoogleFonts.tinos(
+  static TextStyle timefont = TextStyle(
     fontSize: 12,
     color: Color.fromRGBO(70, 70, 70, 1),
   );

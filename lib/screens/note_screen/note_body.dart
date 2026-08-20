@@ -2,8 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:texnote/widgets/glass_container.dart';
 import '../../app_style.dart';
-import 'note_body_helper_functions.dart';
 
 Widget note_body(context, bodyController, font_size, markdown_enabled,markdownkey, markdownData) {
   return Expanded(
@@ -15,7 +15,14 @@ Widget note_body(context, bodyController, font_size, markdown_enabled,markdownke
 
 Widget plain_text_view(context, bodyController, font_size) {
   return Expanded(
-    child: Focus(
+    child: glassContainer(
+      bgAlpha: 10,
+      borderAlpha: 244,
+      borderColor: icon_color,
+      shadowColor: BG,
+      child: Padding(
+        padding: EdgeInsetsGeometry.symmetric(vertical: 20, horizontal: 10) ,
+        child: Focus(
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.tab) {
@@ -73,13 +80,12 @@ Widget plain_text_view(context, bodyController, font_size) {
         decoration: InputDecoration(
           hintText: "Start your note here...",
           hintStyle: AppStyles.bodytext,
-          border: note_border(),
-          enabledBorder: note_border(),
-          focusedBorder: note_border(),
         ),
         style: AppStyles.bodytext.copyWith(fontSize: font_size),
       ),
     ),
+      )
+    )
   );
 }
 

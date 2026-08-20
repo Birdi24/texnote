@@ -1,66 +1,50 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:path_provider/path_provider.dart';
 import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 
-class Note {
-  String title;
+import '../app_style.dart';
+import 'Note.dart';
+
+class TextNote extends Note {
   String body;
-  String path;
-  DateTime date;
-  bool is_fav = false;
-
-  Note(this.title, this.body,  this.path, this.date);
-
+  
+  TextNote({
+    required super.title,
+    required super.date,
+    required super.path,
+    required super.type,
+    required this.body,
+    super.isFavorite = false,
+  });
+  
+  
   String date_string() {
     return DateFormat('h:mm a - MMM d, yyyy').format(date);
   }
 
-  static Future<Note> make_note(String path) async {
-
+  static Future<TextNote> load(String path) async {
     File file = File(path);
     if (await file.exists()) {
       final body = await file.readAsString();
       final title = p.basenameWithoutExtension(path);
       final finalTime = await file.lastModified();
-      return Note(title, body, path, finalTime);
+      return TextNote(title: title, body: body, path: path, date: finalTime, type: NoteType.TextNote);
     }
     throw Exception("File does not exist at $path");
   }
 
-  static Future<List<Note>> collectNotes() async {
-    final directory = await getApplicationDocumentsDirectory();
 
-    debugPrint("Directory: ${directory.path}");
-
-    ///final files = directory .listSync() .where((file) => file.path.endsWith('.txt')) .map((file) => File(file.path)) .toList();
-
-    final files = directory.listSync().where((file) => file.path.endsWith('.txt') &&   !file.uri.pathSegments.last.startsWith('.')).map((file) => File(file.path)).toList();
-
-    debugPrint("Files found: ${files.length}");
-
-    List<Note> notes = [];
-    var i = 0;
-    while (i < files.length) {
-      String path = files[i].path;
-      debugPrint("Processing file: $path");
-      String title = path.split('/').last.replaceAll('.txt', '');
-      String body = await files[i].readAsString();
-      DateTime date = await files[i].lastModified();
-      notes.add(Note(title,body,path, date ));
-      i++;
-    }
-    return notes;
-  }
-
-  Future<void> saveNote(String time, String oldTitle) async {
+  Future<void> save(String oldTitle) async {
     try {
       String newTitle = sanitizeFileName(title.trim());
 
       if (newTitle.isEmpty) {
-        newTitle = sanitizeFileName(time);
+        newTitle = sanitizeFileName(DateFormat('h:mm a - MMM d, yyyy').format(DateTime.now()));
       }
 
       if (path.startsWith('content://')) {
@@ -146,22 +130,6 @@ class Note {
       debugPrint("Error saving note: $e");
     }
   }
-
-
-  String sanitizeFileName(String name) {
-    return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-  }
-
-  Future<void> deleteNote() async {
-    final file = File(path);
-    debugPrint("Deleting file at path: $path");
-
-    if (await file.exists()) {
-      await file.delete();
-      debugPrint("$path deleted!");
-    }
-  }
-
   Future<void> duplicate_note( Future<void> Function() onNoteCreated ) async {
     try {
       String newPath;
@@ -182,25 +150,59 @@ class Note {
     }
   }
 
-  /// by: 0 means newest date first
-  /// by: 1 means oldest date first
-  /// by: 2 means alphabetical order
-  static List<Note> sort_notes(List<Note> current, int by) {
-    switch (by) {
-      case 0:
-        current.sort((a, b) => b.date.compareTo(a.date));
-        break;
+  Widget display() {
+    return Column(
+      children: [
+        Container(
+          width: 180,
+          height: 250,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: icon_color,
+              width: 1,
+            ),
+          ),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Text(
+              body,
+              maxLines: 10,
+              overflow: TextOverflow.fade,
+              style: const TextStyle(
+                color: icon_color,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
 
-      case 1:
-        current.sort((a, b) => a.date.compareTo(b.date));
-        break;
+        const SizedBox(height: 8),
 
-      case 2:
-        current.sort((a, b) => a.title.toLowerCase().compareTo(
-          b.title.toLowerCase(),
-        ));
-        break;
-    }
-    return current;
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: icon_color,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+
+        const SizedBox(height: 3),
+
+        Text(
+          date_string(),
+          style: TextStyle(
+            color: accent,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
   }
 }

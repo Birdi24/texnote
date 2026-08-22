@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:texnote/models/HandwrittenNote.dart';
 import 'package:texnote/screens/latex_screen/main.dart';
 import 'package:texnote/widgets/on_new_collection.dart';
 import 'package:texnote/widgets/on_new_latex_project.dart';
 import '../app_style.dart';
 import '../models/Note.dart';
 import '../models/TextNote.dart';
+import '../screens/HanwrittenNoteScreen/main.dart';
 import '../screens/note_screen/main.dart';
 import 'glass_container.dart';
 import 'package:flutter/cupertino.dart';
 
-void new_file_options(BuildContext context, Future<void> Function() onNoteCreated, collections, notes ,control, add_or_remove_favorite, selected_collection) {
+void new_file_options(BuildContext context, Future<void> Function() onNoteCreated, collections, List<Note>notes ,control, add_or_remove_favorite, selected_collection) {
   double screen_width =  MediaQuery.of(context).size.width;
 
   showModalBottomSheet(
@@ -48,11 +50,29 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
 
                     ListTile(
                       leading: const Icon(Icons.edit_outlined),
+                      title: const Text('New Handwritten Note'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        print("New Note Started");
+                        final note = HandwrittenNote(type: NoteType.HandwrittenNote,title: "", path: (await getApplicationDocumentsDirectory()).path, date: DateTime.now());
+                        //notes.add(note);
+                        await Navigator.push<bool>( context,
+                          MaterialPageRoute( builder: (_) => HandwrittenNotePage(note:note)),
+                        );
+                        if (control == 2) {add_or_remove_favorite(note);}
+                        if (control == 0 && selected_collection != null) {selected_collection.add_to_collections(note); }
+                        await onNoteCreated();
+                        print("Back to home screen from note screen: new note");
+                      },
+                    ),
+
+                    ListTile(
+                      leading: const Icon(Icons.edit_outlined),
                       title: const Text('New Latex Project'),
                       onTap: () async {
                         Navigator.pop(context);
                         print("New Latex Project Started");
-                        //on_new_latex_project(context, notes, collections, onNoteCreated);
+                        //on_new_latex_project(context, notes, collections, onNoteCreated); HandwrittenNotePage
                         await onNoteCreated();
                         print("Back to home screen from note screen: new note");
                       },

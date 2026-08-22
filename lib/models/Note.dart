@@ -12,9 +12,7 @@ abstract class Note {
 
   NoteType type;
 
-  void rename_note(String title){
-    this.title = title;
-  }
+  void rename_note(String title){this.title = title;}
 
   Future<void> delete() async {
     final file = File(path);
@@ -44,7 +42,6 @@ abstract class Note {
 
   Future<void> save(String oldTitle);
 
-
   /// by: 0 means newest date first
   /// by: 1 means oldest date first
   /// by: 2 means alphabetical order
@@ -69,7 +66,7 @@ abstract class Note {
 }
 
 enum NoteType {
-  handwritten,
+  HandwrittenNote,
   TextNote,
   latex,
 }

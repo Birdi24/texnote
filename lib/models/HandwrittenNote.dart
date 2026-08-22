@@ -3,36 +3,116 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
+import 'package:perfect_freehand/perfect_freehand.dart';
 import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_style.dart';
 import 'Note.dart';
 
-class TextNote extends Note {
-  String body;
-  
-  TextNote({
+
+class Stroke {
+  final List<Offset> points;
+  final double size;
+  final Color color;
+
+  final bool hasStartCap;
+  final bool hasEndCap;
+
+  Path? _cachedPath;
+
+  Stroke({
+    required this.points,
+    required this.size,
+    required this.color,
+    this.hasStartCap = true,
+    this.hasEndCap = true,
+  });
+
+  void invalidateCache() => _cachedPath = null;
+
+  Path buildPath() {
+
+    if (_cachedPath != null) return _cachedPath!;
+
+    final freehandPoints =
+    points.map((p) => PointVector(p.dx, p.dy, 0.5)).toList();
+
+    final outline = getStroke(
+      freehandPoints,
+      options: StrokeOptions(
+        size: size,
+        thinning: 0.5,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: false,
+        start: StrokeEndOptions.start(
+          cap: hasStartCap,
+          taperEnabled: false,
+        ),
+        end: StrokeEndOptions.end(
+          cap: hasEndCap,
+          taperEnabled: false,
+        ),
+      ),
+    );
+
+    final path = Path();
+    if (outline.isNotEmpty) {
+      path.moveTo(outline.first.dx, outline.first.dy);
+      for (final point in outline.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      path.close();
+    }
+
+    _cachedPath = path;
+    return path;
+  }
+
+
+  String get_string() {
+    String ret = "Stroke:";
+    for (final point in points) {
+      ret += "${point.dx},${point.dy},";
+    }
+    ret += "\nsize:$size\ncolor:$color\n";
+    return ret;
+  }
+}
+
+class HandwrittenNote extends Note {
+  String cover ="1";
+  List<Stroke> strokes = [];
+
+  HandwrittenNote({
     required super.title,
     required super.date,
     required super.path,
     required super.type,
-    required this.body,
     super.isFavorite = false,
   });
-  
-  
+
+
   String date_string() {
     return DateFormat('h:mm a - MMM d, yyyy').format(date);
   }
 
-  static Future<TextNote> load(String path) async {
+  String get_string(){
+    String ret ="";
+    for (int i = 0; i<strokes.length; i++) {
+      ret+= strokes[i].get_string();
+    }
+    return ret;
+  }
+
+  static Future<HandwrittenNote> load(String path) async {
     File file = File(path);
     if (await file.exists()) {
-      final body = await file.readAsString();
+      final strokes = await file.readAsString();
       final title = p.basenameWithoutExtension(path);
       final finalTime = await file.lastModified();
-      return TextNote(title: title, body: body, path: path, date: finalTime, type: NoteType.TextNote);
+      return HandwrittenNote(title: title, path: path, date: finalTime, type: NoteType.TextNote);
     }
     throw Exception("File does not exist at $path");
   }
@@ -71,7 +151,7 @@ class TextNote extends Note {
         }
 
         final existingFile = await saf.stat(
-          uri.toString()
+            uri.toString()
         );
 
         if (existingFile == null) {
@@ -118,7 +198,7 @@ class TextNote extends Note {
 
       final file = File(newPath);
 
-      await file.writeAsString(body);
+      await file.writeAsString(get_string());
 
       title = newTitle;
       path = file.path;
@@ -132,15 +212,15 @@ class TextNote extends Note {
   Future<void> duplicate_note( Future<void> Function() onNoteCreated ) async {
     try {
       String newPath;
-      if (path.endsWith('.txt')) {
-        newPath = path.replaceFirst(".txt", "-Copy.txt");
+      if (path.endsWith('.note')) {
+        newPath = path.replaceFirst(".note", "-Copy.note");
       } else {
-        newPath = p.join(path, "${sanitizeFileName(title)}-Copy.txt");
+        newPath = p.join(path, "${sanitizeFileName(title)}-Copy.note");
       }
 
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
-      await file.writeAsString(body);
+      await file.writeAsString(get_string());
       await onNoteCreated();
 
     }
@@ -158,24 +238,13 @@ class TextNote extends Note {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
+            color: collection_color(cover),
             border: Border.all(
               color: icon_color,
               width: 1,
             ),
           ),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Text(
-              body,
-              maxLines: 10,
-              overflow: TextOverflow.fade,
-              style: const TextStyle(
-                color: icon_color,
-                fontSize: 13,
-                height: 1.5,
-              ),
-            ),
-          ),
+
         ),
 
         const SizedBox(height: 8),
@@ -205,3 +274,4 @@ class TextNote extends Note {
     );
   }
 }
+

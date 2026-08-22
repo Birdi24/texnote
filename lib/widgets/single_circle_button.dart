@@ -4,7 +4,7 @@ import '../app_style.dart';
 import 'glass_container.dart';
 
 Widget single_circle_button(
-    IconData icon,
+    icon,
     double size,
     double alpha,
     String label,
@@ -12,6 +12,7 @@ Widget single_circle_button(
     BuildContext context,
     screen_width, {
       double? button_width,
+      double rotation = 0,
     }) {
   final width = button_width ?? ((screen_width > 600) ? 68.0 : 58.0);
   return glassContainer(
@@ -26,10 +27,13 @@ Widget single_circle_button(
         },
         customBorder: const CircleBorder(),
         child: Center(
-          child: Icon(
-            icon,
-            color: icon_color,
-            size: size,
+          child: Transform.rotate(
+            angle: rotation,
+            child: Icon(
+              icon,
+              color: icon_color,
+              size: size,
+            ),
           ),
         ),
       ),

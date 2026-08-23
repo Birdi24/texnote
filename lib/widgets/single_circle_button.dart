@@ -13,10 +13,11 @@ Widget single_circle_button(
     screen_width, {
       double? button_width,
       double rotation = 0,
+      int bgAlpha = 10
     }) {
   final width = button_width ?? ((screen_width > 600) ? 68.0 : 58.0);
   return glassContainer(
-    width: width, height: width, radius: width / 2,
+    width: width, height: width, radius: width / 2, bgAlpha: bgAlpha,
     borderAlpha: alpha,
     child: Material(
       color: Colors.transparent,

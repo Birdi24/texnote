@@ -38,8 +38,9 @@ class TopCanvas extends StatefulWidget {
   final VoidCallback? onChanged;
   final bool Function() suspended;
   final double Function() zoom;
+  final void Function(Offset position)? onEraseFromBottom;
 
-  const TopCanvas({super.key, required this.onCommit, this.onChanged, required this.suspended,required this.zoom});
+  const TopCanvas({super.key, required this.onCommit, this.onChanged, required this.suspended,required this.zoom, this.onEraseFromBottom});
   @override
   State<TopCanvas> createState() => TopCanvasState();
 }
@@ -48,26 +49,70 @@ class TopCanvasState extends State<TopCanvas> {
   Stroke? _currentStroke;
   List<Stroke> _toplayer = [];
 
-  static const int kMaxPointsPerSegment = 300;
-  static const int kSegmentOverlap = 8;
+  double _penSize = .5;
+  double _eraserSize = 1.0;
+  DrawingTool _selectedTool = DrawingTool.pen;
+  int kMaxPointsPerSegment = 300;
+  int kSegmentOverlap = 8;
 
   double penSize = .5;
   Color penColor = icon_color;
   int topStrokeLen = 0;
 
   void setTool(DrawingTool tool) {
+    _selectedTool = tool;
     setState(() {
       if (tool == DrawingTool.pen) {
         penColor = icon_color;
-        penSize = .5;
-      } else {
+        penSize = _penSize;
+      } else if (tool == DrawingTool.eraser || tool == DrawingTool.eraser2) {
         penColor = BG;
-        penSize = 10.0;
+        penSize = _eraserSize;
       }
     });
   }
 
-  final List<Stroke> _redoStack = [];
+  void changeSize(double delta) {
+    setState(() {
+      if (_selectedTool == DrawingTool.pen) {
+        _penSize = (_penSize + delta).clamp(0.1, 50.0);
+        penSize = _penSize;
+      } else {
+        _eraserSize = (_eraserSize + delta).clamp(0.1, 50.0);
+        penSize = _eraserSize;
+      }
+    });
+    widget.onChanged?.call();
+  }
+
+  void setColor(Color color) {
+    setState(() {
+      penColor = color;
+    });
+    widget.onChanged?.call();
+  }
+
+  void _eraseStrokeAt(Offset position) {
+    bool changed = false;
+    final double threshold = penSize * 2.0;
+
+    setState(() {
+      _toplayer.removeWhere((stroke) {
+        bool hit = stroke.points.any((p) => (p - position).distance < threshold);
+        if (hit) changed = true;
+        return hit;
+      });
+    });
+
+    if (changed) {
+      topStrokeLen = _toplayer.where((s) => s.hasEndCap).length;
+      widget.onChanged?.call();
+      widget.onCommit([]);
+    }
+
+    widget.onEraseFromBottom?.call(position);
+  }
+
 
   void cancelCurrentStroke() {
     if (_currentStroke == null) return;
@@ -119,7 +164,6 @@ class TopCanvasState extends State<TopCanvas> {
   void _endStroke() {
     if (_currentStroke == null) return;
     topStrokeLen++;
-    _redoStack.clear();
 
     if (topStrokeLen >= 50) {
       final strokesToCommit = [..._toplayer, _currentStroke!,];
@@ -139,49 +183,17 @@ class TopCanvasState extends State<TopCanvas> {
     widget.onChanged?.call();
     debugPrint("top layer: ${_toplayer.length}");
   }
-  void setStroke(strokes) {
+  void setStrokes(List<Stroke> strokes) {
     setState(() {
-      _toplayer = strokes;
+      _toplayer = List.from(strokes);
       topStrokeLen = _toplayer.where((s) => s.hasEndCap).length;
     });
   }
 
-  bool get canUndo => _toplayer.isNotEmpty;
-  bool get canRedo => _redoStack.isNotEmpty;
+  List<Stroke> getStrokes() => List.from(_toplayer);
 
-  void undo() {
-    if (_toplayer.isEmpty) return;
+  bool get isTopLayerEmpty => _toplayer.isEmpty;
 
-    setState(() {
-      final stroke = _toplayer.removeLast();
-      _redoStack.add(stroke);
-      if (stroke.hasEndCap) {
-        topStrokeLen--;
-      }
-    });
-
-    widget.onChanged?.call();
-    // Signal commit to sync the full stroke list if necessary
-    widget.onCommit([]);
-  }
-
-  void redo() {
-    if (_redoStack.isEmpty) {
-      debugPrint("redo empty");
-      return;
-    }
-
-    setState(() {
-      final stroke = _redoStack.removeLast();
-      _toplayer.add(stroke);
-      if (stroke.hasEndCap) {
-        topStrokeLen++;
-      }
-    });
-
-    widget.onChanged?.call();
-    widget.onCommit([]);
-  }
   void update(){
     setState(() {
 
@@ -191,10 +203,30 @@ class TopCanvasState extends State<TopCanvas> {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: Listener(
-        onPointerDown: (event) {_startStroke(event.localPosition);},
-        onPointerMove: (event) {_updateStroke(event.localPosition);},
-        onPointerUp: (_) {_endStroke();},
-        onPointerCancel: (_) {_endStroke();},
+        onPointerDown: (event) {
+          if (_selectedTool == DrawingTool.eraser2) {
+            _eraseStrokeAt(event.localPosition);
+          } else {
+            _startStroke(event.localPosition);
+          }
+        },
+        onPointerMove: (event) {
+          if (_selectedTool == DrawingTool.eraser2) {
+            _eraseStrokeAt(event.localPosition);
+          } else {
+            _updateStroke(event.localPosition);
+          }
+        },
+        onPointerUp: (_) {
+          if (_selectedTool != DrawingTool.eraser2) {
+            _endStroke();
+          }
+        },
+        onPointerCancel: (_) {
+          if (_selectedTool != DrawingTool.eraser2) {
+            _endStroke();
+          }
+        },
 
         child: CustomPaint(
           painter: HandwritingPainter(strokes: _toplayer, currentStroke: _currentStroke,),

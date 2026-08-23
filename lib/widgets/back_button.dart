@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import '../app_style.dart';
 
 Widget back_button(context, Future<void> Function() save,changed) {
@@ -15,7 +16,7 @@ Widget back_button(context, Future<void> Function() save,changed) {
           }
           Navigator.pop(context,true);
         },
-        child: const Icon(Icons.arrow_back),
+        child: const Icon(LucideIcons.chevron_left),
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
           minimumSize: Size.zero,

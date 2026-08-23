@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:texnote/models/HandwrittenNote.dart';
 import 'package:texnote/screens/latex_screen/main.dart';
@@ -31,7 +32,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                   children: [
 
                     ListTile(
-                      leading: const Icon(Icons.edit_outlined),
+                      leading: const Icon(LucideIcons.type_outline),
                       title: const Text('New note'),
                       onTap: () async {
                         Navigator.pop(context);
@@ -49,7 +50,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                     ),
 
                     ListTile(
-                      leading: const Icon(Icons.edit_outlined),
+                      leading: const RotatedBox(quarterTurns: 3, child: Icon(LucideIcons.pen_tool),),
                       title: const Text('New Handwritten Note'),
                       onTap: () async {
                         Navigator.pop(context);
@@ -67,7 +68,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                     ),
 
                     ListTile(
-                      leading: const Icon(Icons.edit_outlined),
+                      leading: const Icon(LucideIcons.square_function),
                       title: const Text('New Latex Project'),
                       onTap: () async {
                         Navigator.pop(context);
@@ -79,7 +80,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                     ),
 
                     ListTile(
-                      leading: const Icon(Icons.folder_outlined),
+                      leading: const Icon(LucideIcons.folder_plus),
                       title: const Text('New Collection'),
                       onTap: () {
                         Navigator.pop(context);

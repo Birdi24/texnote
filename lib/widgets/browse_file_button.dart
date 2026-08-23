@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:texnote/widgets/glass_container.dart';
 import '../app_style.dart';
 import '../io/browse_file.dart';
@@ -30,7 +31,7 @@ Widget browse_button(context,  Future<void> Function() onNoteCreated) {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(
-            Icons.folder_open,
+            LucideIcons.folder,
             size: 22,
             color: icon_color,
           ),

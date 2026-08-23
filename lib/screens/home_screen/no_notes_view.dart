@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../app_style.dart';
 import '../../widgets/browse_file_button.dart';
@@ -13,7 +14,7 @@ Widget no_note_view(context, Future<void> Function() onNoteChanged,collections, 
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon( Icons.note_add_outlined, size: 72),
+          const Icon( LucideIcons.file_plus, size: 72),
           const SizedBox(height: 12),
           Text( in_fav? "No favorite notes yet": "No notes yet", style: AppStyles.title2, ),
           const SizedBox(height: 8),

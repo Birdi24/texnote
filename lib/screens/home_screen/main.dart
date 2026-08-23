@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:texnote/models/TextNote.dart';
 import 'package:texnote/models/collections.dart';
 import 'package:texnote/screens/home_screen/home_body.dart';
@@ -396,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen>
                           InputBorder.none,
                           hintText: 'Search notes...',
                           prefixIcon:
-                          const Icon(Icons.search),
+                          const Icon(LucideIcons.search),
                           suffixIcon: IconButton(
                             icon:
                             const Icon(Icons.clear),

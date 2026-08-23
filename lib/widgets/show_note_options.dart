@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:intl/intl.dart';
 
 import '../app_style.dart';
@@ -95,7 +96,7 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ListTile(
-                      leading: const Icon(Icons.edit_outlined),
+                      leading: const Icon(LucideIcons.pen),
                       title: const Text('Rename note'),
                         onTap: () {
                           Navigator.pop(context);
@@ -109,7 +110,7 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                     ),
 
                     ListTile(
-                      leading: Icon(Icons.star_outline ,color:  notes[index].isFavorite? Colors.red : icon_color),
+                      leading: Icon(LucideIcons.star ,color:  notes[index].isFavorite? Colors.red : icon_color),
                       title: notes[index].isFavorite? Text('Remove from favorites' ,style: TextStyle(color: Colors.red),) : Text('Add to favorites'),
                       onTap: () {
                         Navigator.pop(context);
@@ -118,7 +119,7 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                     ),
 
                     ListTile(
-                      leading: const Icon(Icons.copy_outlined),
+                      leading: const Icon(LucideIcons.copy),
                       title: const Text('Duplicate'),
                       onTap: () {
                         Navigator.pop(context);
@@ -127,7 +128,7 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                     ),
 
                     ListTile(
-                      leading: const Icon(Icons.folder_outlined),
+                      leading: const Icon(LucideIcons.folder),
                       title: const Text('Add to collection'),
                       onTap: () {
                         Navigator.pop(context);
@@ -261,7 +262,7 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
                     const Divider(height: 1),
                     ListTile(
                       leading: const Icon(
-                        Icons.delete_outline,
+                        LucideIcons.trash_2,
                         color: Colors.red,
                       ),
                       title: const Text(

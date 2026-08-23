@@ -1,6 +1,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../app_style.dart';
 import '../../widgets/single_circle_button.dart';
@@ -66,9 +67,9 @@ Widget top_right_button_cluster(control, _inCollection,Function() onNoteChanged,
           child: Row(
               spacing: 8,
               children: [
-                (control != 0 || _inCollection) ? single_circle_button(Icons.search, 20.0,90, "Search", onSearchChanged, context, screen_width, button_width: 45.0 ) : SizedBox.shrink(),
+                (control != 0 || _inCollection) ? single_circle_button(LucideIcons.search, 20.0,90, "Search", onSearchChanged, context, screen_width, button_width: 45.0 ) : SizedBox.shrink(),
                 single_circle_button(Icons.sort_sharp, 20.0,90, "Sort", onSortChanged, context, screen_width, button_width: 45.0 ),
-                single_circle_button(Icons.more_horiz, 20.0,90, "settings", onNoteChanged, context, screen_width, button_width: 45.0 ),
+                single_circle_button(LucideIcons.ellipsis, 20.0,90, "settings", onNoteChanged, context, screen_width, button_width: 45.0 ),
               ]
           )
       ),

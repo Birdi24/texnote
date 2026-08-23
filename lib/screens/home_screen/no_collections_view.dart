@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../app_style.dart';
 import '../../widgets/browse_file_button.dart';
@@ -26,7 +27,7 @@ Widget no_collections_view(context, Future<void> Function() onNoteChanged,collec
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.folder_copy, size: 72),
+              const Icon(LucideIcons.folder_plus, size: 72),
               const SizedBox(height: 12),
               Text("No collections yet", style: AppStyles.title2),
               const SizedBox(height: 8),

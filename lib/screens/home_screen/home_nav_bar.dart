@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app_style.dart';
@@ -24,7 +25,7 @@ Widget home_nav_bar(onNoteChanged, context, screen_width, control, onControlChan
               children: [
                 _buildNavButton(Icons.collections_bookmark_outlined, "Collections", control == 0, onControlChanged, 0),
                 _buildNavButton(Icons.all_inclusive, "All", control == 1, onControlChanged, 1),
-                _buildNavButton(Icons.star_outline, "Favorites", control == 2, onControlChanged, 2),
+                _buildNavButton(LucideIcons.star, "Favorites", control == 2, onControlChanged, 2),
               ],
             ),
           ),
@@ -32,7 +33,7 @@ Widget home_nav_bar(onNoteChanged, context, screen_width, control, onControlChan
           const SizedBox(width: 8),
 
           single_circle_button(
-            Icons.add, 34.0, 34, "Add",
+            LucideIcons.plus, 34.0, 34, "Add",
             () async { new_file_options(context, onNoteChanged,collections, notes,control,add_or_remove_favorite,selected_collection);},
             context, screen_width, button_width: (screen_width > 600) ? 68 : 58,
           ),

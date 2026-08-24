@@ -13,7 +13,7 @@ import 'Note.dart';
 
 class Stroke {
   final List<Offset> points;
-  final double size;
+  double size;
   final Color color;
 
   final bool hasStartCap;
@@ -28,6 +28,48 @@ class Stroke {
     this.hasStartCap = true,
     this.hasEndCap = true,
   });
+
+  void translate(Offset delta) {
+    for (int i = 0; i < points.length; i++) {
+      points[i] = points[i] + delta;
+    }
+    invalidateCache();
+  }
+
+  void scale(double scale, Offset origin) {
+    for (int i = 0; i < points.length; i++) {
+      points[i] = origin + (points[i] - origin) * scale;
+    }
+    size *= scale;
+    invalidateCache();
+  }
+
+  Rect getBounds() {
+    if (points.isEmpty) return Rect.zero;
+    double minX = points[0].dx;
+    double maxX = points[0].dx;
+    double minY = points[0].dy;
+    double maxY = points[0].dy;
+
+    for (final p in points) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+
+    return Rect.fromLTRB(minX, minY, maxX, maxY).inflate(size / 2);
+  }
+
+  Stroke copy() {
+    return Stroke(
+      points: List.from(points),
+      size: size,
+      color: color,
+      hasStartCap: hasStartCap,
+      hasEndCap: hasEndCap,
+    );
+  }
 
   void invalidateCache() => _cachedPath = null;
 

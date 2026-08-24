@@ -12,13 +12,15 @@ import 'DualCanvas.dart';
 class CanvasHistoryState {
   final List<Stroke> bottomLayer;
   final List<Stroke> topLayer;
+  final int numPages;
 
-  CanvasHistoryState({required this.bottomLayer, required this.topLayer});
+  CanvasHistoryState({required this.bottomLayer, required this.topLayer, required this.numPages});
 
-  factory CanvasHistoryState.capture(List<Stroke> bottom, List<Stroke> top) {
+  factory CanvasHistoryState.capture(List<Stroke> bottom, List<Stroke> top, int numPages) {
     return CanvasHistoryState(
       bottomLayer: List.from(bottom),
       topLayer: List.from(top),
+      numPages: numPages,
     );
   }
 }
@@ -61,7 +63,9 @@ class _CanvasViewState extends State<CanvasView> {
 
   DrawingTool _selectedTool = DrawingTool.pen;
   Color _primaryColor = Colors.black;
-  Color _secondaryColor = Colors.blue;
+  Color _secondaryColor = Colors.indigo.shade900;
+  Color _highlighterPrimaryColor = Colors.yellow.withAlpha(77);
+  Color _highlighterSecondaryColor = Colors.green.withAlpha(77);
   bool _showColorPicker = false;
 
   final List<CanvasHistoryState> _history = [];
@@ -69,6 +73,8 @@ class _CanvasViewState extends State<CanvasView> {
 
   late double _pageWidth;
   late double _pageHeight;
+  double _basePageHeight = 0;
+  int _numPages = 1;
 
   double get _scale => _referenceScale * _zoom;
 
@@ -93,8 +99,9 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _initializeFit(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    _pageHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
-    _pageWidth = _pageHeight * .707;
+    _basePageHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+    _pageWidth = _basePageHeight * .707;
+    _pageHeight = _basePageHeight * _numPages;
 
     _referenceScale = 1.0;
     _zoom = 1.0;
@@ -119,7 +126,7 @@ class _CanvasViewState extends State<CanvasView> {
     final bottom = widget.bottomLayerStrokes;
     final top = widget.topCanvasKey.currentState?.getStrokes() ?? [];
 
-    final newState = CanvasHistoryState.capture(bottom, top);
+    final newState = CanvasHistoryState.capture(bottom, top, _numPages);
 
     // Don't record duplicate states
     if (_historyIndex >= 0) {
@@ -144,6 +151,7 @@ class _CanvasViewState extends State<CanvasView> {
   }
 
   bool _areStatesEqual(CanvasHistoryState a, CanvasHistoryState b) {
+    if (a.numPages != b.numPages) return false;
     if (a.bottomLayer.length != b.bottomLayer.length) return false;
     if (a.topLayer.length != b.topLayer.length) return false;
     
@@ -159,6 +167,9 @@ class _CanvasViewState extends State<CanvasView> {
   }
 
   void _applyHistoryState(CanvasHistoryState state) {
+    _numPages = state.numPages;
+    _pageHeight = _basePageHeight * _numPages;
+    
     widget.bottomLayerStrokes.clear();
     widget.bottomLayerStrokes.addAll(state.bottomLayer);
     widget.bottomCanvasKey.currentState?.update();
@@ -293,16 +304,55 @@ class _CanvasViewState extends State<CanvasView> {
     }
   }
 
+  List<Stroke> _selectFromBottom(Path lassoPath) {
+    final List<Stroke> selected = [];
+    final List<Stroke> remaining = [];
+
+    for (final stroke in widget.bottomLayerStrokes) {
+      bool isInside = stroke.points.any((p) => lassoPath.contains(p));
+      if (isInside) {
+        selected.add(stroke);
+      } else {
+        remaining.add(stroke);
+      }
+    }
+
+    if (selected.isNotEmpty) {
+      setState(() {
+        widget.bottomLayerStrokes.clear();
+        widget.bottomLayerStrokes.addAll(remaining);
+      });
+      widget.bottomCanvasKey.currentState?.update();
+      widget.onCommit([]);
+      // We don't record history here because TopCanvas will call onChanged which records history
+    }
+
+    return selected;
+  }
+
   void _onColorChanged(Color color) {
     setState(() {
-      if (color == _secondaryColor) {
-        final temp = _primaryColor;
-        _primaryColor = _secondaryColor;
-        _secondaryColor = temp;
+      if (_selectedTool == DrawingTool.highlighter) {
+        // Ensure transparency for highlighter
+        final highlighterColor = color.withOpacity(0.3);
+        if (highlighterColor == _highlighterSecondaryColor) {
+          final temp = _highlighterPrimaryColor;
+          _highlighterPrimaryColor = _highlighterSecondaryColor;
+          _highlighterSecondaryColor = temp;
+        } else {
+          _highlighterPrimaryColor = highlighterColor;
+        }
+        widget.topCanvasKey.currentState?.setColor(_highlighterPrimaryColor);
       } else {
-        _primaryColor = color;
+        if (color == _secondaryColor) {
+          final temp = _primaryColor;
+          _primaryColor = _secondaryColor;
+          _secondaryColor = temp;
+        } else {
+          _primaryColor = color;
+        }
+        widget.topCanvasKey.currentState?.setColor(_primaryColor);
       }
-      widget.topCanvasKey.currentState?.setColor(_primaryColor);
     });
   }
 
@@ -341,23 +391,64 @@ class _CanvasViewState extends State<CanvasView> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          const ColoredBox(color: BG),
-                          RepaintBoundary(child: BottomCanvas(key: widget.bottomCanvasKey, strokes: widget.bottomLayerStrokes,),),
-                          TopCanvas(
-                            key: widget.topCanvasKey,
-                            onCommit: (strokes) {
-                              widget.onCommit(strokes);
-                              _recordHistory();
-                            },
-                            onChanged: () {
-                              setState(() {});
-                              _recordHistory();
-                            },
-                            suspended: () => _drawingSuspended,
-                            zoom: get_zoom,
-                            onEraseFromBottom: _eraseFromBottom,
+                          // Background Layer
+                          SingleChildScrollView(
+                            physics: const NeverScrollableScrollPhysics(),
+                            child: Column(
+                              children: List.generate(_numPages, (index) => Container(
+                                width: _pageWidth,
+                                height: _basePageHeight,
+                                decoration: BoxDecoration(
+                                  color: BG,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: icon_color.withAlpha(40),
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                ),
+                                child: index > 0 ? Align(
+                                  alignment: Alignment.topRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Text(
+                                      "Page ${index + 1}",
+                                      style: AppStyles.icon_text.copyWith(
+                                        fontSize: 14,
+                                        color: icon_color.withAlpha(30),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ) : null,
+                              )),
+                            ),
                           ),
-
+                          // Drawing Layers
+                          RepaintBoundary(child: BottomCanvas(key: widget.bottomCanvasKey, strokes: widget.bottomLayerStrokes,),),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: icon_color.withAlpha(20),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: TopCanvas(
+                              key: widget.topCanvasKey,
+                              onCommit: (strokes) {
+                                widget.onCommit(strokes);
+                                _recordHistory();
+                              },
+                              onChanged: () {
+                                setState(() {});
+                                _recordHistory();
+                              },
+                              suspended: () => _drawingSuspended,
+                              zoom: get_zoom,
+                              onEraseFromBottom: _eraseFromBottom,
+                              onSelectFromBottom: _selectFromBottom,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -367,22 +458,50 @@ class _CanvasViewState extends State<CanvasView> {
                 Positioned(
                   top: 10,
                   left: 10,
-                  child: top_button_array(
+                  child: history_button_array(
                     context,
                     _handleUndo,
                     _handleRedo,
                     canUndo: _historyIndex > 0,
                     canRedo: _historyIndex < _history.length - 1,
-                    selectedTool: _selectedTool,
-                    onToolChanged: (tool) {
-                      setState(() {
-                        _selectedTool = tool;
-                        widget.topCanvasKey.currentState?.setTool(tool);
-                        if (tool == DrawingTool.pen) {
-                          widget.topCanvasKey.currentState?.setColor(_primaryColor);
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: tool_button_array(
+                      context,
+                      selectedTool: _selectedTool,
+                      onToolChanged: (tool) {
+                        if (tool == DrawingTool.duplicate) {
+                          widget.topCanvasKey.currentState?.setTool(tool);
+                          return;
                         }
-                      });
-                    },
+                        setState(() {
+                          _selectedTool = tool;
+                          widget.topCanvasKey.currentState?.setTool(tool);
+                          if (tool == DrawingTool.pen) {
+                            widget.topCanvasKey.currentState?.setColor(_primaryColor);
+                          } else if (tool == DrawingTool.highlighter) {
+                            widget.topCanvasKey.currentState?.setColor(_highlighterPrimaryColor);
+                          }
+                        });
+                      },
+                      onAddPage: () {
+                        debugPrint("Add page triggered. Current pages: $_numPages");
+                        setState(() {
+                          _numPages++;
+                          _pageHeight = _basePageHeight * _numPages;
+                          
+                          // Auto-scroll to the bottom (new page)
+                          final viewportSize = _getSafeAreaSize(context);
+                          _offset = Offset(_offset.dx, -_pageHeight);
+                          _offset = _clampOffset(_offset, _scale, viewportSize);
+                        });
+                        _recordHistory();
+                      },
+                    ),
                   ),
                 ),
                 Align(
@@ -392,7 +511,7 @@ class _CanvasViewState extends State<CanvasView> {
                     child: left_button_array(
                       context,
                       selectedTool: _selectedTool,
-                      currentSize: widget.topCanvasKey.currentState?.penSize ?? 0.5,
+                      currentSize: widget.topCanvasKey.currentState?.penSize ?? 3.0,
                       onIncrementSize: () {
                         widget.topCanvasKey.currentState?.changeSize(0.5);
                       },
@@ -403,8 +522,8 @@ class _CanvasViewState extends State<CanvasView> {
                         widget.topCanvasKey.currentState?.changeSize(delta);
                       },
                       onSwitchEraserType: _switchEraserType,
-                      currentPenColor: _primaryColor,
-                      secondaryPenColor: _secondaryColor,
+                      currentPenColor: (_selectedTool == DrawingTool.highlighter) ? _highlighterPrimaryColor : _primaryColor,
+                      secondaryPenColor: (_selectedTool == DrawingTool.highlighter) ? _highlighterSecondaryColor : _secondaryColor,
                       onColorChanged: _onColorChanged,
                       onOpenColorPicker: _openColorPicker,
                     ),
@@ -423,7 +542,7 @@ class _CanvasViewState extends State<CanvasView> {
                           children: [
                             Expanded(
                               child: FullColorPicker(
-                                initialColor: _primaryColor,
+                                initialColor: (_selectedTool == DrawingTool.highlighter) ? _highlighterPrimaryColor : _primaryColor,
                                 onColorChanged: _onColorChanged,
                               ),
                             ),

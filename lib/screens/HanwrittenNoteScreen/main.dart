@@ -34,9 +34,10 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: BG.withAlpha(252),
+
         body: LayoutBuilder(builder: (context, scaffoldConstraints) => SafeArea(
           child: LayoutBuilder(builder: (context, safeAreaConstraints) {
-          return CanvasView(bottomLayerStrokes: bottomlayer, onCommit: _commitToBottom, bottomCanvasKey: _bottomCanvasKey, topCanvasKey: _topCanvasKey,);
+          return CanvasView(bottomLayerStrokes: bottomlayer, onCommit: _commitToBottom, bottomCanvasKey: _bottomCanvasKey, topCanvasKey: _topCanvasKey);
           },
         ),
       ),

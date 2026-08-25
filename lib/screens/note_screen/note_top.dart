@@ -2,9 +2,10 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:texnote/screens/note_screen/text_manipulation_buttons.dart';
+import 'package:texnote/widgets/single_circle_button.dart';
 import '../../app_style.dart';
-import '../../widgets/back_button.dart';
 import '../../widgets/options_button.dart';
 import '../../widgets/title_label.dart';
 
@@ -50,7 +51,11 @@ Widget tablet_view(context, changed, Future<void> Function() save,
   return Row(
 
     children: [
-      back_button(context, save, changed),
+      
+      single_circle_button(LucideIcons.chevron_left, 30.0, 90, "back",
+          () async {if (changed){ await save();}Navigator.pop(context,true);},
+          context, MediaQuery.of(context).size.width,button_width: 40),
+
       const SizedBox(width: 12),
 
       Expanded(child: title_label(context, titleController),),
@@ -90,7 +95,9 @@ Widget mobile_view(context, changed, Future<void> Function() save,
     children: [
       Row(
         children: [
-          back_button(context, save, changed),
+          single_circle_button(LucideIcons.chevron_left, 30.0, 40, "back",
+                  () async {if (changed){ await save();}Navigator.pop(context,true);},
+              context, MediaQuery.of(context).size.width,button_width: 40),
           const SizedBox(width: 12),
           Expanded(child: title_label(context, titleController),),
           const SizedBox(width:12),

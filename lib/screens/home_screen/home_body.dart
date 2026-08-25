@@ -4,6 +4,8 @@ import '../../app_style.dart';
 import '../../models/Note.dart';
 import '../../models/collections.dart';
 import '../../models/TextNote.dart';
+import '../../models/HandwrittenNote.dart';
+import '../HanwrittenNoteScreen/main.dart';
 import '../../widgets/show_note_options.dart';
 import '../note_screen/main.dart';
 
@@ -20,6 +22,7 @@ Widget note_card({
   required List<Collection> collections,
   required Future<void> Function() onNoteChanged,
   required void Function(Note) onNoteDeleted,
+  required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
 }) {
   void showOptions() {
@@ -32,6 +35,7 @@ Widget note_card({
       collections,
       onNoteChanged,
       onNoteDeleted,
+      onNoteAdded,
       addToFavorites,
     );
   }
@@ -41,11 +45,18 @@ Widget note_card({
     onDoubleTap: showOptions,
 
     onTap: () async {
-      if (note.type == TextNote) {
+      if (note.type == NoteType.TextNote) {
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => TextNoteScreen(note as TextNote),
+          ),
+        );
+      } else if (note.type == NoteType.HandwrittenNote) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HandwrittenNotePage(note: note as HandwrittenNote),
           ),
         );
       }
@@ -136,6 +147,7 @@ Widget home_body({
   required List<Collection> collections,
   required Future<void> Function() onNoteChanged,
   required void Function(Note) onNoteDeleted,
+  required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
   required void Function(Collection) openCollection,
   required Collection? selectedCollection,
@@ -193,6 +205,7 @@ Widget home_body({
         collections: collections,
         onNoteChanged: onNoteChanged,
         onNoteDeleted: onNoteDeleted,
+        onNoteAdded: onNoteAdded,
         addToFavorites: addToFavorites,
       );
     }).toList(),

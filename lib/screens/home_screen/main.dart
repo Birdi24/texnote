@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen>
     List<Note> result;
     if (control == 2) {
       result = favorites;
-    } else if (_inCollection && _selectedCollection != null) {
+    } else if (_inCollection && _selectedCollection != null && control == 0) {
       result = _selectedCollection!.notes;
     } else {
       result = notes;
@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return result.where((note) {
-      if (note.type == TextNote) {
+      if (note.type == NoteType.TextNote) {
         return note.title
             .toLowerCase()
             .contains(_searchQuery) ||
@@ -165,6 +165,20 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  void onNoteAdded(Note note) {
+    setState(() {
+      notes.add(note);
+      if (control == 2) {
+        favorites.add(note);
+        note.isFavorite = true;
+      }
+      if (_inCollection && _selectedCollection != null) {
+        _selectedCollection!.notes.add(note);
+      }
+    });
+    onNoteChanged();
+  }
+
   Future<void> onNoteChanged() async {
     await saveAppState();
     refresh();
@@ -180,6 +194,8 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       control = newControl;
     });
+
+
 
     if (_pageController.hasClients) {
       await _pageController.animateToPage(
@@ -254,6 +270,11 @@ class _HomeScreenState extends State<HomeScreen>
     final screenWidth =
         MediaQuery.of(context).size.width;
 
+    debugPrint("HomeScreen build: ${notes.length} notes, ${displayedNotes.length} displayed");
+    for (var n in notes) {
+      debugPrint("Note in list: ${n.title} (${n.type})");
+    }
+
     return PopScope(
       canPop: !_inCollection,
       onPopInvokedWithResult: (didPop, result) {
@@ -294,6 +315,7 @@ class _HomeScreenState extends State<HomeScreen>
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
+                      onNoteAdded: onNoteAdded,
                       addToFavorites:
                       add_or_remove_favorite,
                       selectedCollection:
@@ -310,6 +332,7 @@ class _HomeScreenState extends State<HomeScreen>
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
+                      onNoteAdded: onNoteAdded,
                       addToFavorites:
                       add_or_remove_favorite,
                       selectedCollection:
@@ -326,6 +349,7 @@ class _HomeScreenState extends State<HomeScreen>
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
+                      onNoteAdded: onNoteAdded,
                       addToFavorites:
                       add_or_remove_favorite,
                       selectedCollection:

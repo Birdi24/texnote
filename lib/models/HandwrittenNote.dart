@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 
 import '../app_style.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'Note.dart';
 
 
@@ -73,6 +75,28 @@ class Stroke {
 
   void invalidateCache() => _cachedPath = null;
 
+  Map<String, dynamic> toMap() {
+    return {
+      'points': points.map((p) => {'dx': p.dx, 'dy': p.dy}).toList(),
+      'size': size,
+      'color': color.value,
+      'hasStartCap': hasStartCap,
+      'hasEndCap': hasEndCap,
+    };
+  }
+
+  factory Stroke.fromMap(Map<String, dynamic> map) {
+    return Stroke(
+      points: (map['points'] as List)
+          .map((p) => Offset((p['dx'] as num).toDouble(), (p['dy'] as num).toDouble()))
+          .toList(),
+      size: (map['size'] as num).toDouble(),
+      color: Color(map['color'] as int),
+      hasStartCap: map['hasStartCap'] ?? true,
+      hasEndCap: map['hasEndCap'] ?? true,
+    );
+  }
+
   Path buildPath() {
 
     if (_cachedPath != null) return _cachedPath!;
@@ -111,16 +135,6 @@ class Stroke {
     _cachedPath = path;
     return path;
   }
-
-
-  String get_string() {
-    String ret = "Stroke:";
-    for (final point in points) {
-      ret += "${point.dx},${point.dy},";
-    }
-    ret += "\nsize:$size\ncolor:$color\n";
-    return ret;
-  }
 }
 
 class HandwrittenNote extends Note {
@@ -140,25 +154,38 @@ class HandwrittenNote extends Note {
     return DateFormat('h:mm a - MMM d, yyyy').format(date);
   }
 
-  String get_string(){
-    String ret ="";
-    for (int i = 0; i<strokes.length; i++) {
-      ret+= strokes[i].get_string();
-    }
-    return ret;
+  String get_json() {
+    return jsonEncode({
+      'strokes': strokes.map((s) => s.toMap()).toList(),
+      'cover': cover,
+    });
   }
 
   static Future<HandwrittenNote> load(String path) async {
+    debugPrint("Loading HandwrittenNote from $path");
     File file = File(path);
     if (await file.exists()) {
-      final strokes = await file.readAsString();
+      final content = await file.readAsString();
+      final Map<String, dynamic> data = jsonDecode(content);
       final title = p.basenameWithoutExtension(path);
       final finalTime = await file.lastModified();
-      return HandwrittenNote(title: title, path: path, date: finalTime, type: NoteType.TextNote);
+      final note = HandwrittenNote(
+          title: title,
+          path: path,
+          date: finalTime,
+          type: NoteType.HandwrittenNote
+      );
+      if (data['strokes'] != null) {
+        note.strokes = (data['strokes'] as List)
+            .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+            .toList();
+      }
+      note.cover = data['cover'] ?? "1";
+      debugPrint("HandwrittenNote loaded: ${note.title} with ${note.strokes.length} strokes");
+      return note;
     }
     throw Exception("File does not exist at $path");
   }
-
 
   Future<void> save(String oldTitle) async {
     try {
@@ -182,7 +209,7 @@ class HandwrittenNote extends Note {
 
           final renamedFile = await saf.rename(
             uri.toString(),
-            '$newTitle.txt',
+            '$newTitle.note',
           );
 
           // SAF can return a new URI after a rename.
@@ -221,7 +248,7 @@ class HandwrittenNote extends Note {
         directoryPath = p.dirname(path);
       }
 
-      final newPath = p.join(directoryPath, '$newTitle.txt');
+      final newPath = p.join(directoryPath, '$newTitle.note');
 
       debugPrint("NewPath: $newPath");
 
@@ -229,7 +256,7 @@ class HandwrittenNote extends Note {
       if (oldTitle.isNotEmpty && newTitle != oldTitle) {
         debugPrint("Title has changed");
 
-        final oldPath = p.join(directoryPath, '$oldTitle.txt');
+        final oldPath = p.join(directoryPath, '$oldTitle.note');
         final oldFile = File(oldPath);
 
         if (await oldFile.exists()) {
@@ -240,7 +267,7 @@ class HandwrittenNote extends Note {
 
       final file = File(newPath);
 
-      await file.writeAsString(get_string());
+      await file.writeAsString(get_json());
 
       title = newTitle;
       path = file.path;
@@ -251,7 +278,7 @@ class HandwrittenNote extends Note {
       debugPrint("Error saving note: $e");
     }
   }
-  Future<void> duplicate_note( Future<void> Function() onNoteCreated ) async {
+  Future<Note> duplicate_note() async {
     try {
       String newPath;
       if (path.endsWith('.note')) {
@@ -262,12 +289,15 @@ class HandwrittenNote extends Note {
 
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
-      await file.writeAsString(get_string());
-      await onNoteCreated();
+      await file.writeAsString(get_json());
+      HandwrittenNote dup = HandwrittenNote(title: title+"-Copy", date: DateTime.now(), path: path, type: type);
+      dup.strokes = strokes;
+      return dup;
 
     }
     catch (e) {
       debugPrint("Error duplicating note: $e");
+      return HandwrittenNote(title: "INVALID", type: type, date: date,path: path);
     }
   }
 
@@ -286,7 +316,9 @@ class HandwrittenNote extends Note {
               width: 1,
             ),
           ),
-
+          child: const Center(
+            child: Icon(LucideIcons.pen_tool, size: 50, color: icon_color),
+          ),
         ),
 
         const SizedBox(height: 8),

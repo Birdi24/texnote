@@ -78,8 +78,16 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
   );
 }
 
-void show_note_options(BuildContext context, List<Note> notes,int index, collections, Future<void> Function() onNoteChanged , void Function(Note) onNoteDeleted, void Function(Note) add_to_favorites) {
-  double screen_width =  MediaQuery.of(context).size.width;
+void show_note_options(
+    BuildContext context,
+    List<Note> notes,
+    int index,
+    collections,
+    Future<void> Function() onNoteChanged,
+    void Function(Note) onNoteDeleted,
+    void Function(Note) onNoteAdded,
+    void Function(Note) add_to_favorites) {
+  double screen_width = MediaQuery.of(context).size.width;
 
   showModalBottomSheet(
     context: context,
@@ -87,45 +95,51 @@ void show_note_options(BuildContext context, List<Note> notes,int index, collect
     builder: (context) {
       return Padding(
           padding: const EdgeInsets.all(16),
-          child: SizedBox( width: screen_width >500 ? 450 : screen_width -50,
-              child:Material(
+          child: SizedBox(
+              width: screen_width > 500 ? 450 : screen_width - 50,
+              child: Material(
                 color: BG,
                 borderRadius: BorderRadius.circular(20),
                 clipBehavior: Clip.antiAlias,
-                child: SingleChildScrollView( child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      leading: const Icon(LucideIcons.pen),
-                      title: const Text('Rename note'),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                          leading: const Icon(LucideIcons.pen),
+                          title: const Text('Rename note'),
+                          onTap: () {
+                            Navigator.pop(context);
+
+                            rename_note(context, notes, index, onNoteChanged);
+                          }),
+                      ListTile(
+                        leading: Icon(LucideIcons.star,
+                            color: notes[index].isFavorite
+                                ? Colors.red
+                                : icon_color),
+                        title: notes[index].isFavorite
+                            ? Text(
+                                'Remove from favorites',
+                                style: TextStyle(color: Colors.red),
+                              )
+                            : Text('Add to favorites'),
                         onTap: () {
                           Navigator.pop(context);
-
-                          rename_note(
-                            context,
-                            notes,
-                            index, onNoteChanged
-                          );
-                        }
-                    ),
-
-                    ListTile(
-                      leading: Icon(LucideIcons.star ,color:  notes[index].isFavorite? Colors.red : icon_color),
-                      title: notes[index].isFavorite? Text('Remove from favorites' ,style: TextStyle(color: Colors.red),) : Text('Add to favorites'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        add_to_favorites(notes[index]);
-                      },
-                    ),
-
-                    ListTile(
-                      leading: const Icon(LucideIcons.copy),
-                      title: const Text('Duplicate'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        notes[index].duplicate_note(onNoteChanged);
-                      },
-                    ),
+                          add_to_favorites(notes[index]);
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(LucideIcons.copy),
+                        title: const Text('Duplicate'),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          Note dup = await notes[index].duplicate_note();
+                          if (dup.title != "INVALID") {
+                            onNoteAdded(dup);
+                          }
+                        },
+                      ),
 
                     ListTile(
                       leading: const Icon(LucideIcons.folder),

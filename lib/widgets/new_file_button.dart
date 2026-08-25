@@ -56,7 +56,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                         Navigator.pop(context);
                         print("New Note Started");
                         final note = HandwrittenNote(type: NoteType.HandwrittenNote,title: "", path: (await getApplicationDocumentsDirectory()).path, date: DateTime.now());
-                        //notes.add(note);
+                        notes.add(note);
                         await Navigator.push<bool>( context,
                           MaterialPageRoute( builder: (_) => HandwrittenNotePage(note:note)),
                         );

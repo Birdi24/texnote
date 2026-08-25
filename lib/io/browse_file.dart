@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:saf/saf.dart';
+import 'package:path/path.dart' as p;
 import '../models/Note.dart';
 import '../models/TextNote.dart';
+import '../models/HandwrittenNote.dart';
 
 class FileOpenerScreen {
   final Saf _saf = Saf(); Future<Note?> browseFiles() async {
@@ -32,34 +34,39 @@ class FileOpenerScreen {
   }
 }
 
-Future<List<TextNote>> collect() async {
+Future<List<Note>> collect() async {
   final directory = await getApplicationDocumentsDirectory();
 
   debugPrint("Directory: ${directory.path}");
 
-  //final files = directory .listSync() .where((file) => file.path.endsWith('.txt')) .map((file) => File(file.path)) .toList();
-
-  //final files = directory.listSync().where((file) => file.path.endsWith('.txt') &&   !file.uri.pathSegments.last.startsWith('.')).map((file) => File(file.path)).toList();
-
   final files = directory
       .listSync(recursive: true)
       .where((file) =>
-  (file.path.endsWith('.txt') || file.path.endsWith('.tex')) &&
+  (file.path.endsWith('.txt') || file.path.endsWith('.json') || file.path.endsWith('.note')) &&
   !file.uri.pathSegments.last.startsWith('.'))
       .map((file) => File(file.path))
       .toList();
   debugPrint("Files found: ${files.length}");
+  for (var f in files) {
+    debugPrint("Found file: ${f.path}");
+  }
 
-  List<TextNote> notes = [];
+  List<Note> notes = [];
   var i = 0;
   while (i < files.length) {
-  String path = files[i].path;
-  debugPrint("Processing file: $path");
-  String title = path.split('/').last.replaceAll('.txt', '');
-  String body = await files[i].readAsString();
-  DateTime date = await files[i].lastModified();
-  notes.add(TextNote(title: title, body: body, path: path, date: date, type: NoteType.TextNote));
-  i++;
+    String path = files[i].path;
+    debugPrint("Processing file: $path");
+    
+    try {
+      if (path.endsWith('.note')) {
+        notes.add(await HandwrittenNote.load(path));
+      } else {
+        notes.add(await TextNote.load(path));
+      }
+    } catch (e) {
+      debugPrint("Error loading note at $path: $e");
+    }
+    i++;
   }
   return notes;
 }

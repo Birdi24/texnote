@@ -129,7 +129,7 @@ class TextNote extends Note {
       debugPrint("Error saving note: $e");
     }
   }
-  Future<void> duplicate_note( Future<void> Function() onNoteCreated ) async {
+  Future<Note> duplicate_note() async {
     try {
       String newPath;
       if (path.endsWith('.txt')) {
@@ -141,11 +141,12 @@ class TextNote extends Note {
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
       await file.writeAsString(body);
-      await onNoteCreated();
-
+      TextNote dup = TextNote(title :this.title+"-Copy",date: DateTime.now(),path: newPath, body: this.body, type: NoteType.TextNote);
+      return dup;
     }
     catch (e) {
       debugPrint("Error duplicating note: $e");
+      return TextNote(title: "INVALID", type: type, date: date,path: path,body: "");
     }
   }
 

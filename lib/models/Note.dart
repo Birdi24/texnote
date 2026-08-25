@@ -38,7 +38,7 @@ abstract class Note {
     return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
   }
 
-  Future<void> duplicate_note( Future<void> Function() onNoteCreated);
+  Future<Note> duplicate_note();
 
   Future<void> save(String oldTitle);
 

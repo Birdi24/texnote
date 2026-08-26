@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
-import '../screens/note_screen/note_body_helper_functions.dart';
+import '../screens/TextNoteScreen/note_body_helper_functions.dart';
 
 class TablePicker extends StatefulWidget {
   final void Function(int rows, int columns) onSelected;
@@ -132,6 +133,42 @@ void table_picker(BuildContext context, TextEditingController controller) {
 
             // Insert table into your TextField
             insertTextAtCursor(table, controller);
+          },
+        ),
+      );
+    },
+  );
+}
+
+void table_picker_quill(BuildContext context, QuillController controller) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        child: TablePicker(
+          onSelected: (rows, columns) {
+            Navigator.pop(context);
+
+            final tableMarkdown = generateMarkdownTable(
+              rows,
+              columns,
+            );
+
+            // Convert to Delta for rich text support
+            final delta = markdownToDelta(tableMarkdown);
+
+            // Insert into Quill
+            final index = controller.selection.baseOffset;
+            final length = controller.selection.extentOffset - index;
+
+            if (index >= 0) {
+              controller.document.replace(index, length, delta);
+              // Move cursor after the inserted table
+              controller.updateSelection(
+                TextSelection.collapsed(offset: index + delta.length),
+                ChangeSource.local,
+              );
+            }
           },
         ),
       );

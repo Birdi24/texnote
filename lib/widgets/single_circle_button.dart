@@ -13,7 +13,8 @@ Widget single_circle_button(
     screen_width, {
       double? button_width,
       double rotation = 0,
-      int bgAlpha = 10
+      int bgAlpha = 10,
+      Color? iconColor,
     }) {
   final width = button_width ?? ((screen_width > 600) ? 68.0 : 58.0);
   return glassContainer(
@@ -32,7 +33,7 @@ Widget single_circle_button(
             angle: rotation,
             child: Icon(
               icon,
-              color: icon_color,
+              color: iconColor ?? icon_color,
               size: size,
             ),
           ),

@@ -9,6 +9,7 @@ import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:dart_quill_delta/dart_quill_delta.dart';
 
 import '../app_style.dart';
 import 'Note.dart';
@@ -154,6 +155,22 @@ class TextNote extends Note {
     }
   }
 
+  String getPreviewText() {
+    try {
+      if (body.startsWith('[') || body.startsWith('{')) {
+        final decoded = jsonDecode(body);
+        if (decoded is List) {
+          final delta = Delta.fromJson(decoded);
+          return delta.operations
+                      .where((op) => op.isInsert && op.data is String)
+                      .map((op) => op.data as String)
+                      .join('');
+        }
+      }
+    } catch (_) {}
+    return body;
+  }
+
   Widget display() {
     return Column(
       children: [
@@ -171,7 +188,7 @@ class TextNote extends Note {
           child: Align(
             alignment: Alignment.topLeft,
             child: Text(
-              body,
+              getPreviewText(),
               maxLines: 10,
               overflow: TextOverflow.fade,
               style: const TextStyle(
@@ -217,7 +234,7 @@ class TextNote extends Note {
       final dir = await saf.pickDirectory();
       if (dir == null) return;
 
-      final bytes = Uint8List.fromList(utf8.encode(body));
+      final bytes = Uint8List.fromList(utf8.encode(getPreviewText()));
 
       await saf.writeFileBytes(
         dir.uri,
@@ -239,7 +256,7 @@ class TextNote extends Note {
           pageFormat: PdfPageFormat.a4,
           build: (context) => [
             pw.Header(level: 0, text: title),
-            pw.Paragraph(text: body),
+            pw.Paragraph(text: getPreviewText()),
           ],
         ),
       );

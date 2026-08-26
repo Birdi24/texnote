@@ -7,7 +7,8 @@ import '../../models/TextNote.dart';
 import '../../models/HandwrittenNote.dart';
 import '../HanwrittenNoteScreen/main.dart';
 import '../../widgets/show_note_options.dart';
-import '../note_screen/main.dart';
+import '../../widgets/show_collection_options.dart';
+import '../TextNoteScreen/main.dart';
 
 import 'no_collections_view.dart';
 import 'no_notes_view.dart';
@@ -76,20 +77,46 @@ Widget collection_card({
   required BuildContext context,
   required Collection collection,
   required List<Collection> collections,
+  required List<Note> allNotes,
   required Future<void> Function() onNoteChanged,
   required void Function(Note) onNoteDeleted,
+  required void Function(Collection) onCollectionDeleted,
+  required void Function(List<Note>) onNotesDeleted,
   required void Function(Note) addToFavorites,
   required void Function(Collection) openCollection,
 }) {
   return GestureDetector(
     onLongPress: () {
-      // Collection options can go here later.
+      final index = collections.indexOf(collection);
+      if (index != -1) {
+        show_collection_options(
+          context,
+          collections,
+          index,
+          allNotes,
+          onNoteChanged,
+          onCollectionDeleted,
+          onNotesDeleted,
+        );
+      }
     },
-
+    onDoubleTap: () {
+      final index = collections.indexOf(collection);
+      if (index != -1) {
+        show_collection_options(
+          context,
+          collections,
+          index,
+          allNotes,
+          onNoteChanged,
+          onCollectionDeleted,
+          onNotesDeleted,
+        );
+      }
+    },
     onTap: () {
       openCollection(collection);
     },
-
     child: collection.display(),
   );
 }
@@ -147,6 +174,8 @@ Widget home_body({
   required List<Collection> collections,
   required Future<void> Function() onNoteChanged,
   required void Function(Note) onNoteDeleted,
+  required void Function(Collection) onCollectionDeleted,
+  required void Function(List<Note>) onNotesDeleted,
   required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
   required void Function(Collection) openCollection,
@@ -176,8 +205,11 @@ Widget home_body({
           context: context,
           collection: collection,
           collections: collections,
+          allNotes: notes,
           onNoteChanged: onNoteChanged,
           onNoteDeleted: onNoteDeleted,
+          onCollectionDeleted: onCollectionDeleted,
+          onNotesDeleted: onNotesDeleted,
           addToFavorites: addToFavorites,
           openCollection: openCollection
         );

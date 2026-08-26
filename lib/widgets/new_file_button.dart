@@ -11,7 +11,7 @@ import '../models/Note.dart';
 import '../models/TextNote.dart';
 import '../io/browse_file.dart';
 import '../screens/HanwrittenNoteScreen/main.dart';
-import '../screens/note_screen/main.dart';
+import '../screens/TextNoteScreen/main.dart';
 import 'glass_container.dart';
 import 'package:flutter/cupertino.dart';
 

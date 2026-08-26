@@ -243,28 +243,44 @@ class HandwrittenNote extends Note {
     File file = File(path);
     if (await file.exists()) {
       final content = await file.readAsString();
-      final Map<String, dynamic> data = jsonDecode(content);
-      final title = p.basenameWithoutExtension(path);
       final finalTime = await file.lastModified();
-      final note = HandwrittenNote(
-          title: title,
-          path: path,
-          date: finalTime,
-          type: NoteType.HandwrittenNote,
-          paperType: data['paperType'] ?? "blank",
-          pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-          images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? []
-      );
-      if (data['strokes'] != null) {
-        note.strokes = (data['strokes'] as List)
-            .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
-            .toList();
-      }
-      note.cover = data['cover'] ?? "1";
+      
+      final note = await compute(_parseNoteData, {
+        'content': content,
+        'path': path,
+        'finalTime': finalTime,
+      });
+      
       debugPrint("HandwrittenNote loaded: ${note.title} with ${note.strokes.length} strokes");
       return note;
     }
     throw Exception("File does not exist at $path");
+  }
+
+  static HandwrittenNote _parseNoteData(Map<String, dynamic> params) {
+    final content = params['content'] as String;
+    final path = params['path'] as String;
+    final finalTime = params['finalTime'] as DateTime;
+
+    final Map<String, dynamic> data = jsonDecode(content);
+    final title = p.basenameWithoutExtension(path);
+
+    final note = HandwrittenNote(
+        title: title,
+        path: path,
+        date: finalTime,
+        type: NoteType.HandwrittenNote,
+        paperType: data['paperType'] ?? "blank",
+        pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? []
+    );
+    if (data['strokes'] != null) {
+      note.strokes = (data['strokes'] as List)
+          .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+          .toList();
+    }
+    note.cover = data['cover'] ?? "1";
+    return note;
   }
 
   Future<void> save(String oldTitle) async {

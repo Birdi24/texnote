@@ -8,8 +8,8 @@ import '../app_style.dart';
 
 Widget glassContainer({
   required Widget child,
-  double width = double.infinity,
-  double height = 70,
+  double? width = double.infinity,
+  double? height = 70,
   double radius = 38,
   double sigmaX = 12,
   double sigmaY = 12,
@@ -28,7 +28,7 @@ Widget glassContainer({
       ),
       child: Container(
         width: width,
-        height: height,
+        height: (height == 0) ? null : height,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(

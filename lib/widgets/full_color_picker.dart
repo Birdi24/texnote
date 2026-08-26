@@ -4,11 +4,13 @@ import 'glass_container.dart';
 class FullColorPicker extends StatefulWidget {
   final Color initialColor;
   final Function(Color) onColorChanged;
+  final List<Color> history;
 
   const FullColorPicker({
     super.key,
     required this.initialColor,
     required this.onColorChanged,
+    this.history = const [],
   });
 
   @override
@@ -17,6 +19,19 @@ class FullColorPicker extends StatefulWidget {
 
 class _FullColorPickerState extends State<FullColorPicker> {
   late HSVColor _hsvColor;
+
+  static const List<Color> standardColors = [
+    Colors.black,
+    Colors.white,
+    Colors.red,
+    Colors.blue,
+    Colors.green,
+    Colors.yellow,
+    Colors.orange,
+    Colors.purple,
+    Colors.pink,
+    Colors.teal,
+  ];
 
   @override
   void initState() {
@@ -34,6 +49,7 @@ class _FullColorPickerState extends State<FullColorPicker> {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // SV Picker
         Expanded(
@@ -120,6 +136,60 @@ class _FullColorPickerState extends State<FullColorPicker> {
             },
           ),
         ),
+        const SizedBox(height: 16),
+        const Text("Standard Colors", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 35,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: standardColors.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final color = standardColors[index];
+              return GestureDetector(
+                onTap: () => _updateColor(HSVColor.fromColor(color)),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (widget.history.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text("Recent Colors", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 35,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.history.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final color = widget.history[index];
+                return GestureDetector(
+                  onTap: () => _updateColor(HSVColor.fromColor(color)),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'app_style.dart';
-import 'screens/home_screen/main.dart';
+import 'screens/HomeScreen/main.dart';
 
 
 void main() {
@@ -15,6 +17,15 @@ class NotesApp extends StatelessWidget {
     return MaterialApp(
       title: "Tex",
       theme: AppStyles.theme,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+      ],
       home: const HomeScreen(),
     );
   }

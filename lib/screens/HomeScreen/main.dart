@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:texnote/models/TextNote.dart';
 import 'package:texnote/models/collections.dart';
-import 'package:texnote/screens/home_screen/home_body.dart';
-import 'package:texnote/screens/home_screen/home_nav_bar.dart';
-import 'package:texnote/screens/home_screen/home_top_bar.dart';
+import 'package:texnote/screens/HomeScreen/home_body.dart';
+import 'package:texnote/screens/HomeScreen/home_nav_bar.dart';
+import 'package:texnote/screens/HomeScreen/home_top_bar.dart';
 
 import '../../app_style.dart';
 import '../../io/browse_file.dart';
@@ -159,6 +159,29 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     setState(() {});
+  }
+
+  void onCollectionDeleted(Collection collection) {
+    setState(() {
+      collections.remove(collection);
+      if (_selectedCollection == collection) {
+        closeCollection();
+      }
+    });
+    saveAppState();
+  }
+
+  void onNotesDeleted(List<Note> notesToDelete) {
+    setState(() {
+      for (var note in notesToDelete) {
+        notes.remove(note);
+        favorites.remove(note);
+        for (final collection in collections) {
+          collection.notes.remove(note);
+        }
+      }
+    });
+    saveAppState();
   }
 
   void onNoteDeleted(Note note) {
@@ -322,6 +345,8 @@ class _HomeScreenState extends State<HomeScreen>
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
+                      onCollectionDeleted: onCollectionDeleted,
+                      onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
                       addToFavorites:
                       add_or_remove_favorite,
@@ -339,6 +364,8 @@ class _HomeScreenState extends State<HomeScreen>
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
+                      onCollectionDeleted: onCollectionDeleted,
+                      onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
                       addToFavorites:
                       add_or_remove_favorite,
@@ -356,6 +383,8 @@ class _HomeScreenState extends State<HomeScreen>
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
+                      onCollectionDeleted: onCollectionDeleted,
+                      onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
                       addToFavorites:
                       add_or_remove_favorite,
@@ -451,6 +480,7 @@ class _HomeScreenState extends State<HomeScreen>
                 add_or_remove_favorite,
                 _selectedCollection,
               ),
+              //Positioned(top: 10, left: 100 , child: Text("screen width: ${screenWidth}"))
             ],
           ),
         ),

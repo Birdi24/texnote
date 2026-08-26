@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_style.dart';
 
 Widget title_label(context, titleController){
-  return SizedBox(
+  return Padding(padding: EdgeInsetsGeometry.only(left: 5) ,child:SizedBox(
     height: 40,
     child: TextField(
       controller: titleController,
@@ -17,5 +17,5 @@ Widget title_label(context, titleController){
       style: AppStyles.title2,
       cursorHeight: 22,
     ),
-  );
+  ));
 }

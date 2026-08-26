@@ -6,7 +6,7 @@ import '../app_style.dart';
 import '../io/browse_file.dart';
 import '../models/Note.dart';
 import '../models/TextNote.dart';
-import '../screens/note_screen/main.dart';
+import '../screens/TextNoteScreen/main.dart';
 
 Widget browse_button(context,  Future<void> Function() onNoteCreated) {
   return GestureDetector(

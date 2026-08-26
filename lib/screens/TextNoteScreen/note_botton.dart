@@ -1,13 +1,16 @@
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
 import '../../app_style.dart';
 import 'note_body_helper_functions.dart';
-Widget note_bottom(String currentTime, TextEditingController bodyController) {
-  return ValueListenableBuilder<TextEditingValue>(
-    valueListenable: bodyController,
-    builder: (context, value, child) {
-      final text = value.text;
+
+Widget note_bottom(String currentTime, QuillController bodyController) {
+  return ListenableBuilder(
+    listenable: bodyController,
+    builder: (context, child) {
+      final text = bodyController.document.toPlainText();
 
       return Container(
         padding: const EdgeInsets.symmetric(

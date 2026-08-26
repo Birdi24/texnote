@@ -1,4 +1,43 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'package:dart_quill_delta/dart_quill_delta.dart';
+import 'package:markdown_quill/markdown_quill.dart';
+import 'package:markdown/markdown.dart' as md;
+
+bool isJson(String text) {
+  if (text.trim().isEmpty) return false;
+  try {
+    final decoded = jsonDecode(text);
+    return decoded is List;
+  } catch (_) {
+    return false;
+  }
+}
+
+Delta markdownToDelta(String markdown) {
+  if (isJson(markdown)) {
+    return Delta.fromJson(jsonDecode(markdown));
+  }
+  final mdDocument = md.Document(
+    encodeHtml: false,
+    extensionSet: md.ExtensionSet.gitHubFlavored,
+  );
+  final mdToDelta = MarkdownToDelta(markdownDocument: mdDocument);
+  var delta = mdToDelta.convert(markdown);
+  
+  // Ensure the delta ends with a newline, which is required by Quill
+  if (delta.isEmpty || delta.last.value is! String || !(delta.last.value as String).endsWith('\n')) {
+    delta = delta.concat(Delta()..insert('\n'));
+  }
+  
+  return delta;
+}
+
+String deltaToMarkdown(Delta delta) {
+  final deltaToMd = DeltaToMarkdown();
+  return deltaToMd.convert(delta);
+}
 
 int getWordCount(String text) {
   if (text.trim().isEmpty) return 0;

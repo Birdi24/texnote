@@ -1,0 +1,3 @@
+- [ ] Optimize `HandwrittenNote.load` using `compute` in `lib/models/HandwrittenNote.dart`
+- [ ] Refactor `collect()` to load notes in parallel in `lib/io/browse_file.dart`
+- [ ] Verify performance improvement and ensure notes load correctly

@@ -7,7 +7,7 @@ class LazyPdfPageStore {
   LazyPdfPageStore({
     required this.pdfPath,
     required this.noteDir,
-    this.renderRadius = 2,   // pages actually rendered around current
+    this.renderRadius = 2, // pages actually rendered around current
     this.diskKeepRadius = 4, // wider buffer before deleting rendered files
     this.maxDimension = 2400.0,
   });
@@ -70,9 +70,7 @@ class LazyPdfPageStore {
     for (int i = lo; i <= hi; i++) {
       if (!_renderedPaths.containsKey(i) && !_inFlight.contains(i)) {
         _inFlight.add(i);
-        toRender.add(
-          pathForPage(i).whenComplete(() => _inFlight.remove(i)),
-        );
+        toRender.add(pathForPage(i).whenComplete(() => _inFlight.remove(i)));
       }
     }
     await Future.wait(toRender);

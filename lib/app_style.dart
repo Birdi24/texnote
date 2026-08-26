@@ -16,7 +16,7 @@ Color collection_color(String s) {
     case "5": return Color.fromRGBO(17, 138, 178, 1.0);
     case "6": return Color.fromRGBO(253, 240, 213, 1.0);
 
-    default: return icon_color;
+    default: return accent;
   }
 
 }

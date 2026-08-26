@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:texnote/screens/HanwrittenNoteScreen/canvas_options.dart';
 
 import '../../app_style.dart';
-import '../../models/HandwrittenNote.dart' show Stroke;
+import '../../models/HandwrittenNote.dart' show Stroke, ImageData;
 import '../../widgets/single_circle_button.dart';
 import 'BottomCanvas.dart';
 import 'TopCanvas.dart';
@@ -15,22 +20,31 @@ import 'CanvasScrollbar.dart';
 
 class CanvasView extends StatefulWidget {
   final List<Stroke> bottomLayerStrokes;
-  final void Function(List<Stroke> strokes) onCommit;
+  final List<ImageData> images;
+  final void Function(List<Stroke> strokes, List<ImageData> images) onCommit;
   final GlobalKey<BottomCanvasState> bottomCanvasKey;
   final GlobalKey<TopCanvasState> topCanvasKey;
   final Future<void> Function() onSave;
   final bool changed;
   final VoidCallback onChanged;
+  final String paperType;
+  final List<String?> pageBackgrounds;
+  final PageBackgroundResolver? resolvePageBackground; // import from CanvasBackground.dart
+
 
   const CanvasView({
     super.key,
     required this.bottomLayerStrokes,
+    required this.images,
     required this.onCommit,
     required this.bottomCanvasKey,
     required this.topCanvasKey,
     required this.onSave,
     required this.changed,
     required this.onChanged,
+    required this.paperType,
+    this.pageBackgrounds = const [],
+    this.resolvePageBackground,
   });
 
   @override
@@ -57,10 +71,14 @@ class _CanvasViewState extends State<CanvasView> {
   double _basePageHeight = 0;
   int _numPages = 1;
   bool _isTransforming = false;
+  bool show_all_buttons = true;
 
   @override
   void initState() {
     super.initState();
+    if (widget.pageBackgrounds.isNotEmpty) {
+      _numPages = widget.pageBackgrounds.length;
+    }
     _transformationController.addListener(_onTransformationChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _recordHistory();
@@ -74,13 +92,35 @@ class _CanvasViewState extends State<CanvasView> {
     super.dispose();
   }
 
+  int _currentPageIndex = 0;
+
   void _onTransformationChanged() {
+    final page = _computeCurrentPage();
+    if (page != _currentPageIndex) {
+      _currentPageIndex = page;
+    }
     setState(() {});
   }
 
+  int _computeCurrentPage() {
+    if (_basePageHeight == 0 || _lastScreenSize == null) return 0;
+
+    // ASSUMPTION (verify against canvas_transformation_controller.dart):
+    // offset.dy is the content translation applied before scaling, so
+    // negative offset.dy = scrolled down that many content pixels. This
+    // matches _addPage() setting offset.dy = -pageHeight to reveal a new page.
+    final zoom = _transformationController.zoom;
+    final scrollY = -_transformationController.offset.dy / zoom;
+    final viewportCenterY = scrollY + (_lastScreenSize!.height / 2) / zoom;
+
+    final page = (viewportCenterY / _basePageHeight).floor();
+    return page.clamp(0, _numPages - 1);
+  }
+
   void _recordHistory() {
-    final top = widget.topCanvasKey.currentState?.getStrokes() ?? [];
-    _historyManager.record(widget.bottomLayerStrokes, top, _numPages);
+    final topStrokes = widget.topCanvasKey.currentState?.getStrokes() ?? [];
+    final topImages = widget.topCanvasKey.currentState?.getImages() ?? [];
+    _historyManager.record(widget.bottomLayerStrokes, topStrokes, _numPages, widget.images, topImages: topImages);
     setState(() {});
     widget.onChanged();
   }
@@ -90,9 +130,13 @@ class _CanvasViewState extends State<CanvasView> {
     _pageHeight = _basePageHeight * _numPages;
     
     widget.bottomLayerStrokes.clear();
-    widget.bottomLayerStrokes.addAll(state.bottomLayer);
+    widget.bottomLayerStrokes.addAll(state.bottomLayer.map((s) => s.copy()).toList());
+    widget.images.clear();
+    widget.images.addAll(state.images.map((i) => i.copy()).toList());
+    
     widget.bottomCanvasKey.currentState?.update();
-    widget.topCanvasKey.currentState?.setStrokes(state.topLayer);
+    widget.topCanvasKey.currentState?.setStrokes(state.topLayer.map((s) => s.copy()).toList());
+    widget.topCanvasKey.currentState?.setImages((state.topImages ?? []).map((i) => i.copy()).toList());
   }
 
   Size _getSafeAreaSize(BuildContext context) {
@@ -139,7 +183,7 @@ class _CanvasViewState extends State<CanvasView> {
     if (state != null) {
       _applyHistoryState(state);
       setState(() {});
-      widget.onCommit([]);
+      widget.onCommit([], []);
     }
   }
 
@@ -148,7 +192,41 @@ class _CanvasViewState extends State<CanvasView> {
     if (state != null) {
       _applyHistoryState(state);
       setState(() {});
-      widget.onCommit([]);
+      widget.onCommit([], []);
+    }
+  }
+
+  Future<void> _handleImportImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      final appDir = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory(p.join(appDir.path, 'note_images'));
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
+      
+      final String fileName = "${DateTime.now().millisecondsSinceEpoch}_${p.basename(image.path)}";
+      final String newPath = p.join(imagesDir.path, fileName);
+      await File(image.path).copy(newPath);
+
+      final zoom = _transformationController.zoom;
+      final offset = _transformationController.offset;
+      final viewportSize = _lastScreenSize ?? Size.zero;
+
+      // Calculate the center of the viewport in canvas coordinates
+      final centerX = (-offset.dx + viewportSize.width / 2) / zoom;
+      final centerY = (-offset.dy + viewportSize.height / 2) / zoom;
+
+      setState(() {
+        widget.images.add(ImageData(
+          position: Offset(centerX - 100, centerY - 100),
+          imagePath: newPath,
+        ));
+      });
+      widget.onChanged();
+      _recordHistory();
     }
   }
 
@@ -199,11 +277,17 @@ class _CanvasViewState extends State<CanvasView> {
         if (hit) changed = true;
         return hit;
       });
+
+      widget.images.removeWhere((img) {
+        bool hit = img.getBounds().contains(position);
+        if (hit) changed = true;
+        return hit;
+      });
     });
 
     if (changed) {
       widget.bottomCanvasKey.currentState?.update();
-      widget.onCommit([]);
+      widget.onCommit([], []);
       _recordHistory();
     }
   }
@@ -227,7 +311,32 @@ class _CanvasViewState extends State<CanvasView> {
         widget.bottomLayerStrokes.addAll(remaining);
       });
       widget.bottomCanvasKey.currentState?.update();
-      widget.onCommit([]);
+      widget.onCommit([], []);
+    }
+    return selected;
+  }
+
+  List<ImageData> _selectImagesFromBottom(Path lassoPath) {
+    final List<ImageData> selected = [];
+    final List<ImageData> remaining = [];
+
+    for (final img in widget.images) {
+      final bounds = img.getBounds();
+      if (lassoPath.contains(bounds.center) || 
+          lassoPath.contains(bounds.topLeft) || 
+          lassoPath.contains(bounds.bottomRight)) {
+        selected.add(img);
+      } else {
+        remaining.add(img);
+      }
+    }
+
+    if (selected.isNotEmpty) {
+      setState(() {
+        widget.images.clear();
+        widget.images.addAll(remaining);
+      });
+      widget.onCommit([], []);
     }
     return selected;
   }
@@ -333,7 +442,22 @@ class _CanvasViewState extends State<CanvasView> {
                                   numPages: _numPages,
                                   pageWidth: _pageWidth,
                                   basePageHeight: _basePageHeight,
+                                  paperType: widget.paperType,
+                                  pageBackgrounds: widget.pageBackgrounds,
+                                  resolvePageBackground: widget.resolvePageBackground,
+                                  currentPage: _currentPageIndex,
+                                  windowRadius: 2,
                                 ),
+                                ...widget.images.map((img) => Positioned(
+                                  left: img.position.dx,
+                                  top: img.position.dy,
+                                  child: Image.file(
+                                    File(img.imagePath),
+                                    width: img.width,
+                                    height: img.height,
+                                    fit: BoxFit.contain,
+                                  ),
+                                )),
                                 RepaintBoundary(
                                   child: BottomCanvas(
                                     key: widget.bottomCanvasKey,
@@ -349,8 +473,8 @@ class _CanvasViewState extends State<CanvasView> {
                                   ),
                                   child: TopCanvas(
                                     key: widget.topCanvasKey,
-                                    onCommit: (strokes) {
-                                      widget.onCommit(strokes);
+                                    onCommit: (strokes, images) {
+                                      widget.onCommit(strokes, images);
                                       _recordHistory();
                                     },
                                     onChanged: () {
@@ -360,7 +484,8 @@ class _CanvasViewState extends State<CanvasView> {
                                     suspended: () => _drawingSuspended,
                                     zoom: () => _transformationController.zoom,
                                     onEraseFromBottom: _eraseFromBottom,
-                                    onSelectFromBottom: _selectFromBottom,
+                                    onSelectStrokesFromBottom: _selectFromBottom,
+                                    onSelectImagesFromBottom: _selectImagesFromBottom,
                                   ),
                                 ),
                               ],
@@ -370,50 +495,54 @@ class _CanvasViewState extends State<CanvasView> {
                       ),
                     ),
                     Positioned(
-                      top: 10,
+                      top: 15,
                       left: 10,
-                      child: Row(
-                        children: [
-                          single_circle_button(LucideIcons.chevron_left, 30.0, 90, "back",
+                      child:single_circle_button(LucideIcons.chevron_left, 30.0, 90, "back",
                                   () async {if (widget.changed){ await widget.onSave();}Navigator.pop(context,true);},
-                                  context, MediaQuery.of(context).size.width,button_width: 40, bgAlpha: 255),
-                          const SizedBox(width: 10),
-                          (MediaQuery.of(context).size.width < 750) ?
-                          SizedBox.shrink():
-                          history_button_array(
-                            context,
-                            _handleUndo,
-                            _handleRedo,
-                            canUndo: _historyManager.canUndo,
-                            canRedo: _historyManager.canRedo,
-                          ),
-                        ],
-                      ),
+                                  context, MediaQuery.of(context).size.width,button_width: 50, bgAlpha: 255),
                     ),
 
-                      Align(
-                        alignment: Alignment.topCenter,
-                        child: (MediaQuery.of(context).size.width >= 750)? Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: tool_button_array(
-                            context,
-                            selectedTool: _selectedTool,
-                            onToolChanged: _onToolChanged,
-                            onAddPage: () => _addPage(viewportSize) )
-                          ) : consolidated_tool_array(
+                    show_all_buttons ? (MediaQuery.of(context).size.width < 750) ?
+                    Positioned(
+                      top: 10, left: MediaQuery.of(context).size.width/2 - 125 > 60 ? MediaQuery.of(context).size.width/2 - 125 : 60,
+                      child:
+                    consolidated_tool_array(
+                      context,
+                      _handleUndo,
+                      _handleRedo,
+                      canUndo: _historyManager.canUndo,
+                      canRedo: _historyManager.canRedo,
+                      selectedTool: _selectedTool,
+                      onToolChanged: _onToolChanged,
+                      onAddPage: () => _addPage(viewportSize),
+                      onImportImage: _handleImportImage,
+                    )) :
+                   Positioned(
+                      top: 10, left: 70,
+
+                      child: history_button_array(
+                      context,
+                      _handleUndo,
+                      _handleRedo,
+                      canUndo: _historyManager.canUndo,
+                      canRedo: _historyManager.canRedo,
+                    ),): SizedBox.shrink(),
+
+                    show_all_buttons ? Align(
+                      alignment: Alignment.topCenter,
+                      child: (MediaQuery.of(context).size.width >= 750)? Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: tool_button_array(
                           context,
-                          _handleUndo,
-                          _handleRedo,
-                          canUndo: _historyManager.canUndo,
-                          canRedo: _historyManager.canRedo,
                           selectedTool: _selectedTool,
                           onToolChanged: _onToolChanged,
                           onAddPage: () => _addPage(viewportSize),
+                          onImportImage: _handleImportImage
                         )
-                        ),
+                        ) : SizedBox.shrink()
+                      ): SizedBox.shrink(),
 
-
-                    Align(
+                    show_all_buttons ? Align(
                       alignment: Alignment.centerLeft,
                       child: Padding(
                         padding: const EdgeInsets.only(left: 10),
@@ -431,7 +560,8 @@ class _CanvasViewState extends State<CanvasView> {
                           onOpenColorPicker: () => setState(() => _showColorPicker = !_showColorPicker),
                         ),
                       ),
-                    ),
+                    ): SizedBox.shrink(),
+
                     if (_showColorPicker)
                       Positioned(
                         left: 80,
@@ -442,6 +572,7 @@ class _CanvasViewState extends State<CanvasView> {
                           onDismiss: () => setState(() => _showColorPicker = false),
                         ),
                       ),
+
                     CanvasScrollbar(
                       transformationController: _transformationController,
                       numPages: _numPages,
@@ -451,7 +582,10 @@ class _CanvasViewState extends State<CanvasView> {
                       safeHeight: safeHeight,
                       viewportSize: viewportSize,
                     ),
-                    Align(alignment: AlignmentGeometry.center, child: Text("width: ${MediaQuery.of(context).size.width}"),)
+            Positioned(
+              bottom: 10,
+              left: 10, child: single_circle_button(show_all_buttons ?LucideIcons.maximize : LucideIcons.minimize, 20, 90 , "minimize/maximize", min_max, context, screenSize.width, button_width: 50))
+                    //Align(alignment: AlignmentGeometry.center, child: Text("width: ${MediaQuery.of(context).size.width}"),)
                   ],
                 ),
               ),
@@ -460,5 +594,11 @@ class _CanvasViewState extends State<CanvasView> {
         );
       },
     );
+  }
+
+  void min_max() {
+    setState(() {
+      show_all_buttons = !show_all_buttons;
+    });
   }
 }

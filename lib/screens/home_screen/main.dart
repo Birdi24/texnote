@@ -72,11 +72,16 @@ class _HomeScreenState extends State<HomeScreen>
     final savedNotes = await collect();
     final savedCollections = await Collection.load_collections(savedNotes);
     final savedFavorites = await load_favorites(savedNotes);
+    notes = savedNotes;
+    collections = savedCollections;
+    favorites = savedFavorites;
+    Note.sort_notes(notes, sort);
+    Note.sort_notes(favorites, sort);
+    Collection.sort_collections(collections, sort);
 
     setState(() {
-      notes = savedNotes;
-      collections = savedCollections;
-      favorites = savedFavorites;
+      notes = notes; favorites =favorites; collections = collections;
+
     });
   }
 
@@ -91,11 +96,13 @@ class _HomeScreenState extends State<HomeScreen>
   // DISPLAYED NOTES
   // ---------------------------------------------------------------------------
 
-  List<Note> get displayedNotes {
+  List<Note> get displayedNotes => _getDisplayedNotesFor(control);
+
+  List<Note> _getDisplayedNotesFor(int targetControl) {
     List<Note> result;
-    if (control == 2) {
+    if (targetControl == 2) {
       result = favorites;
-    } else if (_inCollection && _selectedCollection != null && control == 0) {
+    } else if (_inCollection && _selectedCollection != null && targetControl == 0) {
       result = _selectedCollection!.notes;
     } else {
       result = notes;
@@ -311,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen>
                       control: 0,
                       context: context,
                       notes: notes,
-                      displayedNotes: displayedNotes,
+                      displayedNotes: _getDisplayedNotesFor(0),
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
@@ -328,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen>
                       control: 1,
                       context: context,
                       notes: notes,
-                      displayedNotes: displayedNotes,
+                      displayedNotes: _getDisplayedNotesFor(1),
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
@@ -345,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen>
                       control: 2,
                       context: context,
                       notes: notes,
-                      displayedNotes: displayedNotes,
+                      displayedNotes: _getDisplayedNotesFor(2),
                       collections: collections,
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,

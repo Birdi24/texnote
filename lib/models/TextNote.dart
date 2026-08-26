@@ -1,10 +1,14 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 import '../app_style.dart';
 import 'Note.dart';
@@ -204,5 +208,56 @@ class TextNote extends Note {
         ),
       ],
     );
+  }
+
+  @override
+  Future<void> export() async {
+    try {
+      final saf = Saf();
+      final dir = await saf.pickDirectory();
+      if (dir == null) return;
+
+      final bytes = Uint8List.fromList(utf8.encode(body));
+
+      await saf.writeFileBytes(
+        dir.uri,
+        '$title.txt',
+        'text/plain',
+        bytes,
+      );
+    } catch (e) {
+      debugPrint("Error exporting note: $e");
+    }
+  }
+
+  @override
+  Future<void> exportAsPdf() async {
+    try {
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (context) => [
+            pw.Header(level: 0, text: title),
+            pw.Paragraph(text: body),
+          ],
+        ),
+      );
+
+      final saf = Saf();
+      final dir = await saf.pickDirectory();
+      if (dir == null) return;
+
+      final bytes = await pdf.save();
+
+      await saf.writeFileBytes(
+        dir.uri,
+        '$title.pdf',
+        'application/pdf',
+        bytes,
+      );
+    } catch (e) {
+      debugPrint("Error exporting PDF: $e");
+    }
   }
 }

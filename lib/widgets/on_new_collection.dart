@@ -17,7 +17,9 @@ Future<dynamic> on_new_collection(context, collections, onNoteCreated,bool proje
     return StatefulBuilder(
       builder: (context, setState) {
       return Dialog(
-        backgroundColor: BG, elevation: 0,
+        backgroundColor: BG.withAlpha(140), elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(38)),
+        clipBehavior: Clip.antiAlias,
         child: glassContainer(
           bgAlpha:30,
           borderAlpha: 244,

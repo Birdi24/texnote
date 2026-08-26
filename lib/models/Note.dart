@@ -34,6 +34,9 @@ abstract class Note {
 
   Widget display();
 
+  Future<void> export();
+  Future<void> exportAsPdf();
+
   String sanitizeFileName(String name) {
     return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
   }

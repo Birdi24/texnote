@@ -5,28 +5,39 @@ enum LassoMode { lassoing, moving, resizing, none }
 
 class LassoManager {
   List<Stroke> selectedStrokes = [];
+  List<ImageData> selectedImages = [];
   List<Offset> lassoPoints = [];
   Path? lassoPath;
   Rect? selectionRect;
   LassoMode currentMode = LassoMode.none;
 
   void updateSelectionRect() {
-    if (selectedStrokes.isEmpty) {
+    if (selectedStrokes.isEmpty && selectedImages.isEmpty) {
       selectionRect = null;
       return;
     }
 
-    Rect bounds = selectedStrokes.first.getBounds();
-    for (final stroke in selectedStrokes.skip(1)) {
-      bounds = bounds.expandToInclude(stroke.getBounds());
+    Rect? bounds;
+    
+    for (final stroke in selectedStrokes) {
+      final strokeBounds = stroke.getBounds();
+      bounds = bounds == null ? strokeBounds : bounds.expandToInclude(strokeBounds);
     }
-    selectionRect = bounds.inflate(5.0);
+
+    for (final img in selectedImages) {
+      final imgBounds = img.getBounds();
+      bounds = bounds == null ? imgBounds : bounds.expandToInclude(imgBounds);
+    }
+
+    selectionRect = bounds?.inflate(5.0);
   }
 
-  void startLasso(Offset position, List<Stroke> topLayer) {
-    if (selectedStrokes.isNotEmpty) {
-      topLayer.addAll(selectedStrokes);
+  void startLasso(Offset position, List<Stroke> topLayerStrokes, List<ImageData> topLayerImages) {
+    if (selectedStrokes.isNotEmpty || selectedImages.isNotEmpty) {
+      topLayerStrokes.addAll(selectedStrokes);
+      topLayerImages.addAll(selectedImages);
       selectedStrokes = [];
+      selectedImages = [];
       selectionRect = null;
     }
     lassoPoints = [position];
@@ -39,53 +50,79 @@ class LassoManager {
     lassoPath!.lineTo(position.dx, position.dy);
   }
 
-  void selectStrokesInLasso({
-    required List<Stroke> topLayer,
-    required List<Stroke> Function(Path) onSelectFromBottom,
+  void selectItemsInLasso({
+    required List<Stroke> topLayerStrokes,
+    required List<ImageData> topLayerImages,
+    required List<Stroke> Function(Path) onSelectStrokesFromBottom,
+    required List<ImageData> Function(Path) onSelectImagesFromBottom,
     required VoidCallback onChanged,
   }) {
     if (lassoPath == null) return;
 
     final selectionPath = Path.from(lassoPath!)..close();
 
-    final List<Stroke> newlySelected = [];
-    final List<Stroke> remainingTop = [];
-
-    for (final stroke in topLayer) {
+    // Select Strokes
+    final List<Stroke> newlySelectedStrokes = [];
+    final List<Stroke> remainingTopStrokes = [];
+    for (final stroke in topLayerStrokes) {
       bool isInside = stroke.points.any((p) => selectionPath.contains(p));
       if (isInside) {
-        newlySelected.add(stroke);
+        newlySelectedStrokes.add(stroke);
       } else {
-        remainingTop.add(stroke);
+        remainingTopStrokes.add(stroke);
       }
     }
+    final strokesFromBottom = onSelectStrokesFromBottom(selectionPath);
+    newlySelectedStrokes.addAll(strokesFromBottom);
 
-    final fromBottom = onSelectFromBottom(selectionPath);
-    newlySelected.addAll(fromBottom);
+    // Select Images
+    final List<ImageData> newlySelectedImages = [];
+    final List<ImageData> remainingTopImages = [];
+    for (final img in topLayerImages) {
+      // Check if any corner is inside, or center
+      final bounds = img.getBounds();
+      if (selectionPath.contains(bounds.center) || 
+          selectionPath.contains(bounds.topLeft) || 
+          selectionPath.contains(bounds.bottomRight)) {
+        newlySelectedImages.add(img);
+      } else {
+        remainingTopImages.add(img);
+      }
+    }
+    final imagesFromBottom = onSelectImagesFromBottom(selectionPath);
+    newlySelectedImages.addAll(imagesFromBottom);
 
-    topLayer.clear();
-    topLayer.addAll(remainingTop);
-    selectedStrokes.addAll(newlySelected);
+    topLayerStrokes.clear();
+    topLayerStrokes.addAll(remainingTopStrokes);
+    selectedStrokes.addAll(newlySelectedStrokes);
+
+    topLayerImages.clear();
+    topLayerImages.addAll(remainingTopImages);
+    selectedImages.addAll(newlySelectedImages);
+
     updateSelectionRect();
     lassoPath = null;
     lassoPoints = [];
 
-    if (newlySelected.isNotEmpty) {
+    if (newlySelectedStrokes.isNotEmpty || newlySelectedImages.isNotEmpty) {
       onChanged();
     }
   }
 
   void handleMove(Offset delta, VoidCallback onChanged) {
-    if (selectedStrokes.isEmpty) return;
+    if (selectedStrokes.isEmpty && selectedImages.isEmpty) return;
     for (final stroke in selectedStrokes) {
       stroke.translate(delta);
+    }
+    for (final img in selectedImages) {
+      img.translate(delta);
     }
     updateSelectionRect();
     onChanged();
   }
 
   void handleResize(Offset position, Offset delta, VoidCallback onChanged) {
-    if (selectedStrokes.isEmpty || selectionRect == null) return;
+    if ((selectedStrokes.isEmpty && selectedImages.isEmpty) || selectionRect == null) return;
 
     final center = selectionRect!.center;
     final oldDist = (position - delta - center).distance;
@@ -96,36 +133,51 @@ class LassoManager {
       for (final stroke in selectedStrokes) {
         stroke.scale(scaleFactor, center);
       }
+      for (final img in selectedImages) {
+        img.scaleFromOrigin(scaleFactor, center);
+      }
       updateSelectionRect();
       onChanged();
     }
   }
 
-  void duplicateSelectedStrokes(List<Stroke> topLayer, VoidCallback onChanged) {
-    if (selectedStrokes.isEmpty) return;
+  void duplicateSelectedItems(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, VoidCallback onChanged) {
+    if (selectedStrokes.isEmpty && selectedImages.isEmpty) return;
 
-    final List<Stroke> copies = selectedStrokes.map((s) => s.copy()).toList();
+    final List<Stroke> strokeCopies = selectedStrokes.map((s) => s.copy()).toList();
+    final List<ImageData> imageCopies = selectedImages.map((i) => i.copy()).toList();
+    
     const Offset offset = Offset(20, 20);
-    for (final stroke in copies) {
+    for (final stroke in strokeCopies) {
       stroke.translate(offset);
     }
+    for (final img in imageCopies) {
+      img.translate(offset);
+    }
 
-    topLayer.addAll(selectedStrokes);
-    selectedStrokes = copies;
+    topLayerStrokes.addAll(selectedStrokes);
+    selectedStrokes = strokeCopies;
+
+    topLayerImages.addAll(selectedImages);
+    selectedImages = imageCopies;
+
     updateSelectionRect();
     onChanged();
   }
 
-  void clearSelection(List<Stroke> topLayer, VoidCallback onChanged) {
-    if (selectedStrokes.isEmpty) return;
-    topLayer.addAll(selectedStrokes);
+  void clearSelection(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, VoidCallback onChanged) {
+    if (selectedStrokes.isEmpty && selectedImages.isEmpty) return;
+    topLayerStrokes.addAll(selectedStrokes);
+    topLayerImages.addAll(selectedImages);
     selectedStrokes = [];
+    selectedImages = [];
     selectionRect = null;
     onChanged();
   }
 
-  void removeSelectedStrokes(bool Function(Stroke) predicate) {
-    selectedStrokes.removeWhere(predicate);
+  void removeSelectedItems(bool Function(Stroke) strokePredicate, bool Function(ImageData) imagePredicate) {
+    selectedStrokes.removeWhere(strokePredicate);
+    selectedImages.removeWhere(imagePredicate);
     updateSelectionRect();
   }
 }

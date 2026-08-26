@@ -20,11 +20,13 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
             backgroundColor: Colors.transparent,
             elevation: 0,
             child: glassContainer(
-              bgAlpha: 10,
+
+              bgAlpha: 20,
               borderAlpha: 244,
               borderColor: Colors.red,
-              height: 278,
-              width: screen_width > 420 ? 370 : screen_width - 50,
+
+              height: 220,
+              width: screen_width > 380 ? 330 : screen_width - 50,
               shadowColor: BG,
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -32,7 +34,7 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
                     mainAxisSize: MainAxisSize.min,
                     children: [
 
-                      const SizedBox(height: 45),
+                      const SizedBox(height: 10),
                       const Text(
                         "Delete note?",
                         style: TextStyle(
@@ -173,15 +175,15 @@ void show_note_options(
                                     bgAlpha: 10,
                                     borderAlpha: 244,
                                     borderColor: icon_color,
-                                    height: 230,
-                                    width: screen_width > 420 ? 370 : screen_width - 50,
+                                    height: 240,
+                                    width: screen_width > 380 ? 330 : screen_width - 50,
                                     shadowColor: BG,
                                     child: Padding(
                                       padding: const EdgeInsets.all(24),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const SizedBox(height: 25),
+                                          const SizedBox(height: 10),
 
                                           const Text(
                                             "Add to Collection",
@@ -192,26 +194,39 @@ void show_note_options(
                                           ),
 
                                           const SizedBox(height: 25),
-
-                                          DropdownButton<String>(
-                                            isExpanded: true,
-                                            value: selectedCollection,
-                                            hint: const Text("Select a collection"),
-                                            items: collections.map<DropdownMenuItem<String>>(
-                                                  (collection) {
-                                                return DropdownMenuItem<String>(
-                                                  value: collection.title,
-                                                  child: Text(collection.title),
-                                                );
+                                          Container(
+                                            width: screen_width > 380 ? 310 : screen_width - 70,
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: icon_color,
+                                                width: 1,
+                                              ),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: DropdownButton<String>(
+                                              menuWidth: screen_width > 380 ? 310 : screen_width - 70,
+                                              menuMaxHeight: 300,
+                                              isExpanded: true,
+                                              underline: const SizedBox(),
+                                              borderRadius: BorderRadius.circular(12),
+                                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                                              value: selectedCollection,
+                                              hint: const Text("Select a collection"),
+                                              items: collections.map<DropdownMenuItem<String>>(
+                                                    (collection) {
+                                                  return DropdownMenuItem<String>(
+                                                    value: collection.title,
+                                                    child: Text(collection.title),
+                                                  );
+                                                },
+                                              ).toList(),
+                                              onChanged: (value) {
+                                                dialogSetState(() {
+                                                  selectedCollection = value;
+                                                });
                                               },
-                                            ).toList(),
-                                            onChanged: (value) {
-                                              dialogSetState(() {
-                                                selectedCollection = value;
-                                              });
-                                            },
+                                            ),
                                           ),
-
                                           const SizedBox(height: 25),
 
                                           Row(
@@ -270,7 +285,15 @@ void show_note_options(
                       title: const Text('Export note'),
                       onTap: () {
                         Navigator.pop(context);
-                        //_addToCollection(note);
+                        notes[index].export();
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(LucideIcons.file_type),
+                      title: const Text('Export as PDF'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        notes[index].exportAsPdf();
                       },
                     ),
                     const Divider(height: 1),

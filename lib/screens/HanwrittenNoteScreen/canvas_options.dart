@@ -43,10 +43,11 @@ Widget tool_button_array(
       DrawingTool selectedTool = DrawingTool.pen,
       Function(DrawingTool)? onToolChanged,
       Function()? onAddPage,
+      Function()? onImportImage,
     }) {
   final screen_width = MediaQuery.of(context).size.width;
   return glassContainer(
-    width: 380,
+    width: 430,
     height: 60,
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -59,7 +60,8 @@ Widget tool_button_array(
 
         single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screen_width, button_width: 35.0, bgAlpha: 160),
         single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screen_width, button_width: 35.0, bgAlpha: 160),
-        
+        single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screen_width, button_width: 35.0, bgAlpha: 160),
+
         const VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
         
         single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screen_width, button_width: 35.0, bgAlpha: 160),
@@ -77,6 +79,7 @@ Widget consolidated_tool_array(
       DrawingTool selectedTool = DrawingTool.pen,
       Function(DrawingTool)? onToolChanged,
       Function()? onAddPage,
+      Function()? onImportImage,
     }) {
   final screen_width = MediaQuery.of(context).size.width;
 
@@ -94,11 +97,12 @@ Widget consolidated_tool_array(
     single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screen_width, button_width: 35.0, bgAlpha: 160),
     single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screen_width, button_width: 35.0, bgAlpha: 160),
     single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screen_width, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screen_width, button_width: 35.0, bgAlpha: 160),
     single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screen_width, button_width: 35.0, bgAlpha: 160),
   ];
 
   return glassContainer(
-    width: 280,
+    width: MediaQuery.of(context).size.width > 340 ? 270 : MediaQuery.of(context).size.width - 70,
     height: 60,
     child: SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -107,16 +111,11 @@ Widget consolidated_tool_array(
         padding: const EdgeInsets.only(
           left: 10,
           right: 10,
-          top: 10,
         ),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
+        child:Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             spacing: 10,
             children: buttons,
-          ),
         ),
       ),
     ),

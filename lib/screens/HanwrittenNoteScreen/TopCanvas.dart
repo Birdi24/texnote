@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:texnote/screens/HanwrittenNoteScreen/canvas_options.dart';
 import '../../app_style.dart';
@@ -6,12 +8,13 @@ import 'HandwritingPainter.dart';
 import 'lasso_manager.dart';
 
 class TopCanvas extends StatefulWidget {
-  final void Function(List<Stroke> strokes) onCommit;
+  final void Function(List<Stroke> strokes, List<ImageData> images) onCommit;
   final VoidCallback? onChanged;
   final bool Function() suspended;
   final double Function() zoom;
   final void Function(Offset position)? onEraseFromBottom;
-  final List<Stroke> Function(Path lassoPath)? onSelectFromBottom;
+  final List<Stroke> Function(Path lassoPath)? onSelectStrokesFromBottom;
+  final List<ImageData> Function(Path lassoPath)? onSelectImagesFromBottom;
 
   const TopCanvas({
     super.key,
@@ -20,7 +23,8 @@ class TopCanvas extends StatefulWidget {
     required this.suspended,
     required this.zoom,
     this.onEraseFromBottom,
-    this.onSelectFromBottom,
+    this.onSelectStrokesFromBottom,
+    this.onSelectImagesFromBottom,
   });
 
   @override
@@ -30,6 +34,7 @@ class TopCanvas extends StatefulWidget {
 class TopCanvasState extends State<TopCanvas> {
   Stroke? _currentStroke;
   List<Stroke> _toplayer = [];
+  List<ImageData> _topLayerImages = [];
   final LassoManager _lassoManager = LassoManager();
   Offset? _lastPointerPos;
 
@@ -48,7 +53,7 @@ class TopCanvasState extends State<TopCanvas> {
   void setTool(DrawingTool tool) {
     if (tool == DrawingTool.duplicate) {
       setState(() {
-        _lassoManager.duplicateSelectedStrokes(_toplayer, widget.onChanged ?? () {});
+        _lassoManager.duplicateSelectedItems(_toplayer, _topLayerImages, widget.onChanged ?? () {});
       });
       return;
     }
@@ -75,7 +80,7 @@ class TopCanvasState extends State<TopCanvas> {
           tool == DrawingTool.highlighter;
 
       if (wasLassoTool && isDrawingTool) {
-        _lassoManager.clearSelection(_toplayer, widget.onChanged ?? () {});
+        _lassoManager.clearSelection(_toplayer, _topLayerImages, widget.onChanged ?? () {});
       }
     });
   }
@@ -114,17 +119,24 @@ class TopCanvasState extends State<TopCanvas> {
         return hit;
       });
 
-      _lassoManager.removeSelectedStrokes((stroke) {
-        bool hit = stroke.points.any((p) => (p - position).distance < threshold);
-        if (hit) changed = true;
-        return hit;
-      });
+      _lassoManager.removeSelectedItems(
+        (stroke) {
+          bool hit = stroke.points.any((p) => (p - position).distance < threshold);
+          if (hit) changed = true;
+          return hit;
+        },
+        (image) {
+          bool hit = image.getBounds().contains(position);
+          if (hit) changed = true;
+          return hit;
+        },
+      );
     });
 
     if (changed) {
       topStrokeLen = _toplayer.where((s) => s.hasEndCap).length;
       widget.onChanged?.call();
-      widget.onCommit([]);
+      widget.onCommit([], []);
     }
 
     widget.onEraseFromBottom?.call(position);
@@ -195,10 +207,12 @@ class TopCanvasState extends State<TopCanvas> {
 
     if (topStrokeLen >= 50) {
       final strokesToCommit = [..._toplayer, _currentStroke!];
+      final imagesToCommit = [..._topLayerImages];
       _toplayer.clear();
+      _topLayerImages.clear();
       _currentStroke = null;
       topStrokeLen = 0;
-      widget.onCommit(strokesToCommit);
+      widget.onCommit(strokesToCommit, imagesToCommit);
     } else {
       _toplayer.add(_currentStroke!);
       _currentStroke = null;
@@ -209,12 +223,23 @@ class TopCanvasState extends State<TopCanvas> {
 
   void setStrokes(List<Stroke> strokes) {
     setState(() {
+      _lassoManager.selectedStrokes = [];
+      _lassoManager.selectionRect = null;
       _toplayer = List.from(strokes);
       topStrokeLen = _toplayer.where((s) => s.hasEndCap).length;
     });
   }
 
-  List<Stroke> getStrokes() => List.from(_toplayer);
+  void setImages(List<ImageData> images) {
+    setState(() {
+      _lassoManager.selectedImages = [];
+      _lassoManager.selectionRect = null;
+      _topLayerImages = List.from(images);
+    });
+  }
+
+  List<Stroke> getStrokes() => [..._toplayer, ..._lassoManager.selectedStrokes];
+  List<ImageData> getImages() => [..._topLayerImages, ..._lassoManager.selectedImages];
 
   void update() {
     setState(() {});
@@ -260,10 +285,10 @@ class TopCanvasState extends State<TopCanvas> {
                 } else if (_lassoManager.selectionRect!.contains(event.localPosition)) {
                   _lassoManager.currentMode = LassoMode.moving;
                 } else {
-                  _lassoManager.startLasso(event.localPosition, _toplayer);
+                  _lassoManager.startLasso(event.localPosition, _toplayer, _topLayerImages);
                 }
               } else {
-                _lassoManager.startLasso(event.localPosition, _toplayer);
+                _lassoManager.startLasso(event.localPosition, _toplayer, _topLayerImages);
               }
             });
           } else {
@@ -282,10 +307,10 @@ class TopCanvasState extends State<TopCanvas> {
                   _lassoManager.updateLasso(event.localPosition);
                   break;
                 case LassoMode.moving:
-                  _lassoManager.handleMove(delta, widget.onChanged ?? () {});
+                  _lassoManager.handleMove(delta, () {}); // Don't record history during move
                   break;
                 case LassoMode.resizing:
-                  _lassoManager.handleResize(event.localPosition, delta, widget.onChanged ?? () {});
+                  _lassoManager.handleResize(event.localPosition, delta, () {}); // Don't record history during resize
                   break;
                 case LassoMode.none:
                   break;
@@ -300,11 +325,15 @@ class TopCanvasState extends State<TopCanvas> {
           if (_selectedTool == DrawingTool.lasso) {
             setState(() {
               if (_lassoManager.currentMode == LassoMode.lassoing) {
-                _lassoManager.selectStrokesInLasso(
-                  topLayer: _toplayer,
-                  onSelectFromBottom: widget.onSelectFromBottom ?? (p) => [],
+                _lassoManager.selectItemsInLasso(
+                  topLayerStrokes: _toplayer,
+                  topLayerImages: _topLayerImages,
+                  onSelectStrokesFromBottom: widget.onSelectStrokesFromBottom ?? (p) => [],
+                  onSelectImagesFromBottom: widget.onSelectImagesFromBottom ?? (p) => [],
                   onChanged: widget.onChanged ?? () {},
                 );
+              } else if (_lassoManager.currentMode == LassoMode.moving || _lassoManager.currentMode == LassoMode.resizing) {
+                widget.onChanged?.call(); // Record history once at the end of move/resize
               }
               _lassoManager.currentMode = LassoMode.none;
             });
@@ -327,15 +356,43 @@ class TopCanvasState extends State<TopCanvas> {
           }
           _lastPointerPos = null;
         },
-        child: CustomPaint(
-          painter: HandwritingPainter(
-            strokes: _toplayer,
-            currentStroke: _currentStroke,
-            selectedStrokes: _lassoManager.selectedStrokes,
-            selectionRect: _lassoManager.selectionRect,
-            lassoPath: _lassoManager.lassoPath,
-          ),
-          child: const SizedBox.expand(),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ..._topLayerImages.map((img) => Positioned(
+              left: img.position.dx,
+              top: img.position.dy,
+              child: Opacity(
+                opacity: 0.8,
+                child: Image.file(
+                  File(img.imagePath),
+                  width: img.width,
+                  height: img.height,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            )),
+            ..._lassoManager.selectedImages.map((img) => Positioned(
+              left: img.position.dx,
+              top: img.position.dy,
+              child: Image.file(
+                File(img.imagePath),
+                width: img.width,
+                height: img.height,
+                fit: BoxFit.contain,
+              ),
+            )),
+            CustomPaint(
+              painter: HandwritingPainter(
+                strokes: _toplayer,
+                currentStroke: _currentStroke,
+                selectedStrokes: _lassoManager.selectedStrokes,
+                selectionRect: _lassoManager.selectionRect,
+                lassoPath: _lassoManager.lassoPath,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ],
         ),
       ),
     );

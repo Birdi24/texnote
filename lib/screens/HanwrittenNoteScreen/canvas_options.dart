@@ -56,13 +56,13 @@ Widget tool_button_array(
         single_circle_button(LucideIcons.eraser, 20.0, (selectedTool == DrawingTool.eraser || selectedTool == DrawingTool.eraser2) ? 90 : 40, "eraser", () => onToolChanged?.call(DrawingTool.eraser2), context, screen_width, button_width: 35.0, bgAlpha: 160),
         single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screen_width, button_width: 35.0, bgAlpha: 160),
 
-        const VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
+         VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
 
         single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screen_width, button_width: 35.0, bgAlpha: 160),
         single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screen_width, button_width: 35.0, bgAlpha: 160),
         single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screen_width, button_width: 35.0, bgAlpha: 160),
 
-        const VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
+         VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
         
         single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screen_width, button_width: 35.0, bgAlpha: 160),
       ],
@@ -132,7 +132,7 @@ Widget left_button_array(
       VoidCallback? onDecrementSize,
       Function(double)? onSizeDelta,
       VoidCallback? onSwitchEraserType,
-      Color currentPenColor = Colors.black,
+      Color currentPenColor = BLACK,
       Color secondaryPenColor = Colors.indigo,
       Function(Color)? onColorChanged,
       VoidCallback? onOpenColorPicker,
@@ -198,7 +198,7 @@ Widget eraser_further_options(context,screen_width, selectedTool, onSwitchEraser
 
   return Column(
     children: [
-      const Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
+       Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
       const SizedBox(height: 14,),
       single_circle_button(
         (selectedTool == DrawingTool.eraser) ? LucideIcons.circle_dashed : LucideIcons.circle,
@@ -240,7 +240,7 @@ Widget color_button(Color color, VoidCallback onTap, {bool hasOutline = false}) 
 Widget pen_further_options(context, screen_width, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker) {
   return Column(
       children: [
-        const Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
+         Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
         const SizedBox(height: 14,),
         color_button(
             currentPenColor,

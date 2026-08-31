@@ -5,6 +5,7 @@ import 'package:texnote/models/HandwrittenNote.dart';
 import 'package:texnote/models/Note.dart';
 import 'package:texnote/screens/HanwrittenNoteScreen/main.dart';
 import '../app_style.dart';
+import 'color_picker.dart';
 import 'glass_container.dart';
 
 Future<void> on_new_handwritten_note(
@@ -36,9 +37,9 @@ Future<void> on_new_handwritten_note(
               bgAlpha: 30,
               borderAlpha: 244,
               borderColor: collection_color(selectedColor),
-              height: 430,
+              height: 600,
               width: screen_width > 420 ? 370 : screen_width - 50,
-              shadowColor: collection_color(selectedColor),
+              shadowColor: BG,
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: SingleChildScrollView(
@@ -69,28 +70,17 @@ Future<void> on_new_handwritten_note(
                         child: Text("Color", style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: List.generate(6, (index) {
-                          final colorCode = '${index + 1}';
-                          final selected = selectedColor == colorCode;
-                          return GestureDetector(
-                            onTap: () => setState(() => selectedColor = colorCode),
-                            child: Container(
-                              width: 35,
-                              height: 35,
-                              decoration: BoxDecoration(
-                                color: collection_color(colorCode),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: selected ? icon_color : Colors.transparent,
-                                  width: 3,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
+
+                      ColorPicker(
+                        initialColor: selectedColor,
+                        showFullPicker: true,
+                        onColorChanged: (color, identifier) {
+                          setState(() {
+                            selectedColor = identifier ?? "#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
+                          });
+                        },
                       ),
+                      
                       const SizedBox(height: 20),
                       const Align(
                         alignment: Alignment.centerLeft,
@@ -113,7 +103,7 @@ Future<void> on_new_handwritten_note(
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: icon_color)),
+                            child: Text('Cancel', style: TextStyle(color: icon_color)),
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
@@ -151,7 +141,7 @@ Future<void> on_new_handwritten_note(
                               }
                               await onNoteCreated();
                             },
-                            child: const Text('Create', style: TextStyle(color: icon_color)),
+                            child:  Text('Create', style: TextStyle(color: icon_color)),
                           ),
                         ],
                       ),

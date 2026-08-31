@@ -241,6 +241,33 @@ class TopCanvasState extends State<TopCanvas> {
   List<Stroke> getStrokes() => [..._toplayer, ..._lassoManager.selectedStrokes];
   List<ImageData> getImages() => [..._topLayerImages, ..._lassoManager.selectedImages];
 
+  void shiftContent(double thresholdY, Offset delta) {
+    setState(() {
+      for (final stroke in _toplayer) {
+        if (stroke.getBounds().top >= thresholdY - 1.0) {
+          stroke.translate(delta);
+        }
+      }
+      for (final img in _topLayerImages) {
+        if (img.position.dy >= thresholdY - 1.0) {
+          img.translate(delta);
+        }
+      }
+
+      for (final stroke in _lassoManager.selectedStrokes) {
+        if (stroke.getBounds().top >= thresholdY - 1.0) {
+          stroke.translate(delta);
+        }
+      }
+      for (final img in _lassoManager.selectedImages) {
+        if (img.position.dy >= thresholdY - 1.0) {
+          img.translate(delta);
+        }
+      }
+      _lassoManager.updateSelectionRect();
+    });
+  }
+
   void update() {
     setState(() {});
   }
@@ -389,6 +416,7 @@ class TopCanvasState extends State<TopCanvas> {
                 selectedStrokes: _lassoManager.selectedStrokes,
                 selectionRect: _lassoManager.selectionRect,
                 lassoPath: _lassoManager.lassoPath,
+                backgroundColor: BG,
               ),
               child: const SizedBox.expand(),
             ),

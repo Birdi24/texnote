@@ -4,6 +4,7 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import '../app_style.dart';
 import '../models/Note.dart';
 import '../models/collections.dart';
+import 'color_picker.dart';
 import 'glass_container.dart';
 
 
@@ -26,17 +27,23 @@ void show_collection_options(
       return Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          width: screen_width > 470 ? 420 : screen_width - 50,
-          decoration: const BoxDecoration(
+          width: screen_width >500 ? 450 : screen_width -50,
+          decoration:  BoxDecoration(
             color: BG,
-            borderRadius: BorderRadius.vertical(
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(20),
             ),
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 const SizedBox(height: 10),
 
                 ListTile(
@@ -125,7 +132,8 @@ void show_collection_options(
             ),
           ),
         ),
-      );
+      ),
+    );
     },
   );
 }
@@ -179,10 +187,11 @@ void rename_collection_dialog(
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancel", style: TextStyle(color: icon_color)),
+                      child:  Text("Cancel", style: TextStyle(color: icon_color)),
                     ),
                     const SizedBox(width: 15),
                     ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: collection_color(collections[index].color), foregroundColor: WHITE),
                       onPressed: () async {
                         final newTitle = controller.text.trim();
                         if (newTitle.isEmpty) return;
@@ -210,72 +219,79 @@ void change_collection_color_dialog(
     int index,
     Future<void> Function() onCollectionChanged) {
   final screen_width = MediaQuery.of(context).size.width;
-  final List<String> colorOptions = ["1", "2", "3", "4", "5", "6"];
+  String currentSelected = collections[index].color;
 
   showDialog(
     context: context,
     barrierColor: Colors.transparent,
     builder: (context) {
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: glassContainer(
-          bgAlpha: 10,
-          borderAlpha: 244,
-          borderColor: icon_color,
-          height: 280,
-          width: screen_width > 420 ? 370 : screen_width - 50,
-          shadowColor: BG,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                const Text(
-                  "Collection Color",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 25),
-                Wrap(
-                  spacing: 15,
-                  runSpacing: 15,
-                  children: colorOptions.map((colorId) {
-                    bool isSelected = collections[index].color == colorId;
-                    return GestureDetector(
-                      onTap: () async {
-                        collections[index].color = colorId;
-                        await Collection.save_collections(collections);
-                        await onCollectionChanged();
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                      child: Container(
-                        width: 45,
-                        height: 45,
-                        decoration: BoxDecoration(
-                          color: collection_color(colorId),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected ? icon_color : Colors.transparent,
-                            width: 3,
-                          ),
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: SingleChildScrollView(
+              child: glassContainer(
+                bgAlpha: 10,
+                borderAlpha: 210,
+                borderColor: collection_color(currentSelected),
+                height: 560,
+                width: screen_width > 420 ? 370 : screen_width - 50,
+                shadowColor: BG,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 30, left:24,right: 24, bottom: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Collection Color",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(height: 25),
+                      ColorPicker(
+                        initialColor: currentSelected,
+                        showFullPicker: true,
+                        onColorChanged: (color, identifier) {
+                          setState(() {
+                            currentSelected = identifier ?? "#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 25),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text("Cancel", style: TextStyle(color: icon_color, fontSize: 16, fontWeight: FontWeight.w500)),
+                          ),
+                          const SizedBox(width: 15),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: collection_color(currentSelected),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () async {
+                              collections[index].color = currentSelected;
+                              await Collection.save_collections(collections);
+                              await onCollectionChanged();
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            child: const Text("Done"),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 25),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel", style: TextStyle(color: icon_color)),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
     },
   );
@@ -305,7 +321,8 @@ void add_notes_to_collection_dialog(
             elevation: 0,
 
             child: glassContainer(
-              height: 450,
+              borderAlpha: 244,
+              height: 450, bgAlpha: 70,
               width: screen_width > 420 ? 370 : screen_width - 50,
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -333,7 +350,7 @@ void add_notes_to_collection_dialog(
                               }
                             });
                           },
-                          child: Text(selectedNotes.length == availableNotes.length ? "Deselect All" : "Select All"),
+                          child: Text(selectedNotes.length == availableNotes.length ? "Deselect All" : "Select All" , style: TextStyle(color: collection_color(currentCollection.color), fontWeight: FontWeight(600)),),
                         ),
                       ),
                     Expanded(
@@ -368,10 +385,11 @@ void add_notes_to_collection_dialog(
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text("Cancel", style: TextStyle(color: icon_color)),
+                          child: Text("Cancel", style: TextStyle(color: icon_color)),
                         ),
                         const SizedBox(width: 15),
                         ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: collection_color(currentCollection.color), foregroundColor: WHITE),
                           onPressed: selectedNotes.isEmpty
                               ? null
                               : () async {
@@ -414,11 +432,11 @@ void delete_collection_alert(
         backgroundColor: Colors.transparent,
         elevation: 0,
         child: glassContainer(
-          bgAlpha: 140,
+          bgAlpha: 70,
           borderAlpha: 244,
-          borderColor: Colors.red,
+          borderColor: RED,
           height: 330,
-          width: screen_width > 380 ? 330 : screen_width - 50,
+          width: screen_width > 420 ? 370 : screen_width - 50,
           shadowColor: BG,
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -444,6 +462,8 @@ void delete_collection_alert(
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 45),
+                        backgroundColor: collection_color(collections[index].color),
+                        foregroundColor: WHITE
                       ),
                       onPressed: () async {
                         Navigator.pop(context);
@@ -456,7 +476,7 @@ void delete_collection_alert(
                     const SizedBox(height: 10),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade50,
+                        backgroundColor: RED,
                         minimumSize: const Size(double.infinity, 45),
                       ),
                       onPressed: () async {
@@ -475,11 +495,11 @@ void delete_collection_alert(
                         onCollectionDeleted(collection);
                         onNotesDeleted(notesToDelete);
                       },
-                      child: const Text('Delete with all notes', style: TextStyle(color: Colors.red)),
+                      child: const Text('Delete with all notes', style: TextStyle(color: WHITE)),
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel', style: TextStyle(color: icon_color)),
+                      child: Text('Cancel', style: TextStyle(color: icon_color)),
                     ),
                   ],
                 ),
@@ -513,7 +533,7 @@ void delete_notes_from_collection_dialog(
             backgroundColor: Colors.transparent,
             elevation: 0,
             child: glassContainer(
-              bgAlpha: 140,
+              bgAlpha: 70,
               borderAlpha: 244,
               borderColor: icon_color,
               height: 480,
@@ -545,7 +565,7 @@ void delete_notes_from_collection_dialog(
                               }
                             });
                           },
-                          child: Text(selectedNotes.length == collectionNotes.length ? "Deselect All" : "Select All"),
+                          child: Text(selectedNotes.length == collectionNotes.length ? "Deselect All" : "Select All", style: TextStyle(color: collection_color(currentCollection.color), fontWeight: FontWeight(600)),),
                         ),
                       ),
                     Expanded(
@@ -560,7 +580,7 @@ void delete_notes_from_collection_dialog(
                                   title: Text(note.title, maxLines: 1, overflow: TextOverflow.ellipsis),
                                   subtitle: Text(note.type.name, style: const TextStyle(fontSize: 10)),
                                   value: isSelected,
-                                  activeColor: Colors.red,
+                                  activeColor: RED,
                                   onChanged: (val) {
                                     setState(() {
                                       if (val == true) {
@@ -580,6 +600,8 @@ void delete_notes_from_collection_dialog(
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 40),
+                            backgroundColor: collection_color(currentCollection.color),
+                            foregroundColor: WHITE
                           ),
                           onPressed: selectedNotes.isEmpty
                               ? null
@@ -591,29 +613,20 @@ void delete_notes_from_collection_dialog(
                                   await onCollectionChanged();
                                   if (context.mounted) Navigator.pop(context);
                                 },
-                          child: const Text("Remove from Collection"),
+                          child: Text("Remove from Collection"),
                         ),
                         const SizedBox(height: 8),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade50,
+                            backgroundColor: RED,
+                            foregroundColor: WHITE,
                             minimumSize: const Size(double.infinity, 40),
                           ),
                           onPressed: selectedNotes.isEmpty
                               ? null
                               : () async {
                                   // Confirmation for permanent delete
-                                  bool? confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (c) => AlertDialog(
-                                      title: const Text("Delete Permanently?"),
-                                      content: Text("Are you sure you want to permanently delete ${selectedNotes.length} note(s) from disk?"),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancel")),
-                                        TextButton(onPressed: () => Navigator.pop(c, true), child: const Text("Delete", style: TextStyle(color: Colors.red))),
-                                      ],
-                                    ),
-                                  );
+                                  bool? confirm = await delete_alert_for_collection(context, selectedNotes);
 
                                   if (confirm == true) {
                                     for (var note in selectedNotes) {
@@ -626,11 +639,11 @@ void delete_notes_from_collection_dialog(
                                     if (context.mounted) Navigator.pop(context);
                                   }
                                 },
-                          child: const Text("Delete Permanently", style: TextStyle(color: Colors.red)),
+                          child: const Text("Delete Permanently"),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text("Cancel", style: TextStyle(color: icon_color)),
+                          child: Text("Cancel", style: TextStyle(color: icon_color)),
                         ),
                       ],
                     ),
@@ -644,3 +657,72 @@ void delete_notes_from_collection_dialog(
     },
   );
 }
+
+Future<bool?> delete_alert_for_collection(BuildContext context, List<Note> notes) {
+  final screen_width = MediaQuery.of(context).size.width;
+  return showDialog<bool>(
+      barrierColor: Colors.transparent,
+      context: context,
+      builder: (context) {
+        return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: glassContainer(
+
+              bgAlpha: 20,
+              borderAlpha: 244,
+              borderColor: RED,
+
+              height: 208,
+              width: screen_width > 420 ? 370 : screen_width - 50,
+              shadowColor: BG,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 12),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      const SizedBox(height: 10),
+                      const Text(
+                        "Delete note?",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Text(
+                        textAlign: TextAlign.center,
+                        'Are you sure you want to delete ${notes.length} note(s)?',
+                      ),
+
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Cancel', style: TextStyle(color: icon_color),),
+                          ),
+
+                          const SizedBox(width: 15),
+
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: RED),
+                            onPressed: () async{
+                              return Navigator.pop(context, true);
+                            },
+                            child: const Text('Delete', style: TextStyle(color: WHITE)),
+                          ),
+                        ],
+                      ),
+                    ]
+                ),
+              ),)
+        );
+      }
+  );
+}
+

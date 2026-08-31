@@ -13,11 +13,11 @@ Widget glassContainer({
   double radius = 38,
   double sigmaX = 12,
   double sigmaY = 12,
+  Color? color,
   Color? borderColor,
   double borderAlpha = 17,
-  Color shadowColor = BG,
+  Color? shadowColor,
   int bgAlpha = 10
-
 }) {
   return ClipRRect(
     borderRadius: BorderRadius.circular(radius),
@@ -30,13 +30,14 @@ Widget glassContainer({
         width: width,
         height: (height == 0) ? null : height,
         decoration: BoxDecoration(
+          color: color ?? glass_bg,
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(
-            color: borderColor ?? accent.withAlpha(borderAlpha.toInt()),
+            color: borderColor ?? glass_border,
           ),
           boxShadow: [
             BoxShadow(
-              color: shadowColor.withAlpha(bgAlpha),
+              color: shadowColor ?? glass_shadow,
               blurRadius: 20,
               offset: const Offset(0, 6),
             ),

@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:texnote/models/HandwrittenNote.dart';
-import 'package:texnote/screens/latex_screen/main.dart';
 import 'package:texnote/widgets/on_new_collection.dart';
 import 'package:texnote/widgets/on_new_handwritten_note.dart';
-import 'package:texnote/widgets/on_new_latex_project.dart';
+
 import '../app_style.dart';
+import '../io/browse_file.dart';
 import '../models/Note.dart';
 import '../models/TextNote.dart';
-import '../io/browse_file.dart';
 import '../screens/HanwrittenNoteScreen/main.dart';
 import '../screens/TextNoteScreen/main.dart';
 import 'glass_container.dart';
-import 'package:flutter/cupertino.dart';
 
 void new_file_options(BuildContext context, Future<void> Function() onNoteCreated, collections, List<Note>notes ,control, add_or_remove_favorite, selected_collection) {
   double screen_width =  MediaQuery.of(context).size.width;
@@ -59,18 +56,6 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                       onTap: () async {
                         Navigator.pop(modalContext);
                         await on_new_handwritten_note(context, notes, onNoteCreated, control, add_or_remove_favorite, selected_collection);
-                      },
-                    ),
-
-                    ListTile(
-                      leading: const Icon(LucideIcons.square_function),
-                      title: const Text('New Latex Project'),
-                      onTap: () async {
-                        Navigator.pop(modalContext);
-                        print("New Latex Project Started");
-                        //on_new_latex_project(context, notes, collections, onNoteCreated); HandwrittenNotePage
-                        await onNoteCreated();
-                        print("Back to home screen from note screen: new note");
                       },
                     ),
 
@@ -127,12 +112,11 @@ bool selection_text,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.add, size: 22, color: icon_color,),
+           Icon(Icons.add, size: 22, color: icon_color,),
           const SizedBox(width: 8),
-          Text( selection_text! ? "New Collection" : "New Note", style: AppStyles.icon_text ),
+          Text( selection_text! ? "New Collection" : "New Note", style: AppStyles.icon_text.copyWith(color: icon_color) ),
         ],
       ),
     ),
   );
 }
-

@@ -36,10 +36,10 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
     old_title = widget.note.title;
     bottomlayer.addAll(widget.note.strokes);
 
-    if (widget.note.pdfSourcePath != null) {
+    if (widget.note.pdfSourcePath.isNotEmpty) {
       _pdfStore = LazyPdfPageStore(
-        pdfPath: widget.note.pdfSourcePath!,
-        noteDir: Directory(p.dirname(widget.note.pdfSourcePath!)),
+        pdfPath: widget.note.pdfSourcePath,
+        noteDir: Directory(p.dirname(widget.note.pdfSourcePath)),
       );
     }
   }
@@ -60,11 +60,28 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
 
   Future<String?> _resolvePageBackground(int pageIndex) async {
     if (_pdfStore == null) return null;
-    final path = await _pdfStore!.pathForPage(pageIndex + 1); // store is 1-based
-    if (pageIndex < widget.note.pageBackgrounds.length) {
-      widget.note.pageBackgrounds[pageIndex] = path; // cache result back onto the model
+
+    int pdfPageIndex = 0;
+    for (int i = 0; i < pageIndex; i++) {
+      if (i < widget.note.pageBackgrounds.length) {
+        if (widget.note.pageBackgrounds[i] != "blank") {
+          pdfPageIndex++;
+        }
+      } else {
+        pdfPageIndex++;
+      }
     }
-    return path;
+
+    try {
+      final path = await _pdfStore!.pathForPage(pdfPageIndex + 1); // store is 1-based
+      if (pageIndex < widget.note.pageBackgrounds.length) {
+        widget.note.pageBackgrounds[pageIndex] = path; // cache result back onto the model
+      }
+      return path;
+    } catch (e) {
+      debugPrint("PDF page resolution failed for pageIndex $pageIndex (PDF page $pdfPageIndex): $e");
+      return null;
+    }
   }
 
   Future<void> save() async {

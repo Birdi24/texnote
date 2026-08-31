@@ -4,6 +4,7 @@ import 'package:texnote/models/HandwrittenNote.dart';
 
 import '../app_style.dart';
 import '../models/Note.dart';
+import 'color_picker.dart';
 import 'glass_container.dart';
 import 'on_new_collection.dart';
 
@@ -20,7 +21,7 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
 
               bgAlpha: 20,
               borderAlpha: 244,
-              borderColor: Colors.red,
+              borderColor: RED,
 
               height: 220,
               width: screen_width > 380 ? 330 : screen_width - 50,
@@ -53,7 +54,7 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: icon_color),),
+                            child:  Text('Cancel', style: TextStyle(color: icon_color),),
                           ),
 
                           const SizedBox(width: 15),
@@ -97,8 +98,8 @@ void show_note_options(
       return Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          width: screen_width > 470 ? 420 : screen_width - 50,
-          decoration: const BoxDecoration(
+          width: screen_width >470 ? 420 : screen_width -50,
+          decoration:  BoxDecoration(
             color: BG,
             borderRadius: BorderRadius.vertical(
               top: Radius.circular(20),
@@ -143,13 +144,13 @@ void show_note_options(
                   leading: Icon(
                     LucideIcons.star,
                     color: notes[index].isFavorite
-                        ? Colors.red
+                        ? RED
                         : icon_color,
                   ),
                   title: notes[index].isFavorite
                       ? const Text(
                     'Remove from favorites',
-                    style: TextStyle(color: Colors.red),
+                    style: TextStyle(color: RED),
                   )
                       : const Text('Add to favorites'),
                   onTap: () {
@@ -210,8 +211,8 @@ void show_note_options(
                                 borderAlpha: 244,
                                 borderColor: icon_color,
                                 height: 240,
-                                width: screen_width > 380
-                                    ? 330
+                                width: screen_width > 430
+                                    ? 380
                                     : screen_width - 50,
                                 shadowColor: BG,
                                 child: Padding(
@@ -296,7 +297,7 @@ void show_note_options(
                                             onPressed: () {
                                               Navigator.pop(context);
                                             },
-                                            child: const Text(
+                                            child: Text(
                                               'Cancel',
                                               style: TextStyle(
                                                 color: icon_color,
@@ -353,7 +354,7 @@ void show_note_options(
 
                 ListTile(
                   leading:
-                  const Icon(Icons.ios_share_outlined),
+                  const Icon(LucideIcons.file_up),
                   title: const Text('Export note'),
                   onTap: () {
                     Navigator.pop(context);
@@ -363,7 +364,7 @@ void show_note_options(
 
                 ListTile(
                   leading:
-                  const Icon(LucideIcons.file_type),
+                  const Icon(LucideIcons.upload),
                   title: const Text('Export as PDF'),
                   onTap: () {
                     Navigator.pop(context);
@@ -376,11 +377,11 @@ void show_note_options(
                 ListTile(
                   leading: const Icon(
                     LucideIcons.trash_2,
-                    color: Colors.red,
+                    color: RED,
                   ),
                   title: const Text(
                     'Delete note',
-                    style: TextStyle(color: Colors.red),
+                    style: TextStyle(color: RED),
                   ),
                   onTap: () async {
                     Navigator.pop(context);
@@ -462,7 +463,7 @@ void rename_note(
                       onPressed: () {
                         Navigator.pop(context);
                       },
-                      child: const Text(
+                      child: Text(
                         "Cancel",
                         style: TextStyle(
                           color: icon_color,
@@ -503,73 +504,81 @@ void change_handwritten_note_color_dialog(
     int index,
     Future<void> Function() onNoteChanged) {
   final screen_width = MediaQuery.of(context).size.width;
-  final List<String> colorOptions = ["1", "2", "3", "4", "5", "6"];
   final note = notes[index] as HandwrittenNote;
+  String currentSelected = note.cover;
 
   showDialog(
     context: context,
     barrierColor: Colors.transparent,
     builder: (context) {
-      return Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: glassContainer(
-          bgAlpha: 10,
-          borderAlpha: 244,
-          borderColor: icon_color,
-          height: 280,
-          width: screen_width > 420 ? 370 : screen_width - 50,
-          shadowColor: BG,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                const Text(
-                  "Cover Color",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 25),
-                Wrap(
-                  spacing: 15,
-                  runSpacing: 15,
-                  children: colorOptions.map((colorId) {
-                    bool isSelected = note.cover == colorId;
-                    return GestureDetector(
-                      onTap: () async {
-                        note.cover = colorId;
-                        await note.save(note.title);
-                        await onNoteChanged();
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                      child: Container(
-                        width: 45,
-                        height: 45,
-                        decoration: BoxDecoration(
-                          color: collection_color(colorId),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected ? icon_color : Colors.transparent,
-                            width: 3,
-                          ),
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: SingleChildScrollView(
+              child: glassContainer(
+                bgAlpha: 10,
+                borderAlpha: 244,
+                borderColor: collection_color(currentSelected),
+                height: 560,
+                width: screen_width > 420 ? 370 : screen_width - 50,
+                shadowColor: BG,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 12),
+                      const Text(
+                        "Cover Color",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(height: 25),
+                      ColorPicker(
+                        initialColor: currentSelected,
+                        showFullPicker: true,
+                        onColorChanged: (color, identifier) {
+                          setState(() {
+                            currentSelected = identifier ?? "#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 25),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text("Cancel", style: TextStyle(color: icon_color, fontSize: 16, fontWeight: FontWeight.w500)),
+                          ),
+                          const SizedBox(width: 15),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: collection_color(currentSelected),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () async {
+                              note.cover = currentSelected;
+                              await note.save(note.title);
+                              await onNoteChanged();
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            child: const Text("Done"),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 25),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel", style: TextStyle(color: icon_color)),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
     },
   );

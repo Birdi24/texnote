@@ -30,7 +30,7 @@ Widget browse_button(context,  Future<void> Function() onNoteCreated) {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+           Icon(
             LucideIcons.folder,
             size: 22,
             color: icon_color,

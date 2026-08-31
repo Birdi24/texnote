@@ -191,7 +191,8 @@ class TextNote extends Note {
               getPreviewText(),
               maxLines: 10,
               overflow: TextOverflow.fade,
-              style: const TextStyle(
+              style: TextStyle(
+
                 color: icon_color,
                 fontSize: 13,
                 height: 1.5,
@@ -207,7 +208,7 @@ class TextNote extends Note {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: icon_color,
             fontSize: 15,
             fontWeight: FontWeight.w500,

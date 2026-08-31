@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app_style.dart';
 import '../../models/HandwrittenNote.dart';
 
 
@@ -8,6 +9,7 @@ class HandwritingPainter extends CustomPainter {
   final List<Stroke> selectedStrokes;
   final Rect? selectionRect;
   final Path? lassoPath;
+  final Color backgroundColor;
 
   HandwritingPainter({
     required this.strokes,
@@ -15,6 +17,7 @@ class HandwritingPainter extends CustomPainter {
     this.selectedStrokes = const [],
     this.selectionRect,
     this.lassoPath,
+    this.backgroundColor = Colors.white,
   });
 
   @override
@@ -88,8 +91,10 @@ class HandwritingPainter extends CustomPainter {
     final path = stroke.buildPath(); // cached for finished strokes
     if (path.getBounds().isEmpty && stroke.points.length > 1) return;
 
+    final color = getAdaptiveStrokeColor(stroke.color, backgroundColor);
+
     final paint = Paint()
-      ..color = isSelected ? stroke.color.withOpacity(0.7) : stroke.color
+      ..color = isSelected ? color.withOpacity(0.7) : color
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 

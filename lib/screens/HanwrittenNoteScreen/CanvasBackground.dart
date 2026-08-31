@@ -155,7 +155,7 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
       setState(() => _resolvedPath = path);
       return; // setState triggers rebuild, which will create the FileImage
     }
-    if (path != null && mounted) {
+    if (path != null && path != "blank" && mounted) {
       setState(() => _fileImage = FileImage(File(path!)));
     }
   }
@@ -173,7 +173,7 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.inWindow || _resolvedPath == null) {
+    if (!widget.inWindow || _resolvedPath == null || _resolvedPath == "blank") {
       // Reserves layout space with no decode cost.
       return SizedBox(width: widget.width, height: widget.height);
     }

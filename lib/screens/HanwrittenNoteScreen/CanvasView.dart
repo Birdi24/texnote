@@ -72,7 +72,7 @@ static const Duration _stylusDoublePressWindow =
 Duration(milliseconds: 300);
 bool _stylusButtonHeld = false;
 
-Color _primaryColor = Colors.black;
+Color _primaryColor = BLACK;
 Color _secondaryColor = Colors.indigo.shade900;
 Color _highlighterPrimaryColor = Colors.yellow.withAlpha(77);
 Color _highlighterSecondaryColor = Colors.green.withAlpha(77);
@@ -90,6 +90,10 @@ void initState() {
 super.initState();
 if (widget.pageBackgrounds.isNotEmpty) {
 _numPages = widget.pageBackgrounds.length;
+} else {
+// Ensure pageBackgrounds is at least length 1 if it was empty
+widget.pageBackgrounds.add(null);
+_numPages = 1;
 }
 _transformationController.addListener(_onTransformationChanged);
 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -163,6 +167,29 @@ void _initializeFit(BuildContext context) {
 final mediaQuery = MediaQuery.of(context);
 _basePageHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
 _pageWidth = _basePageHeight * .707;
+
+// Healing: Ensure we have enough pages to show all existing content
+// on the current device's screen size.
+if (_basePageHeight > 0) {
+double maxContentY = 0;
+for (final stroke in widget.bottomLayerStrokes) {
+final b = stroke.getBounds();
+if (b.bottom > maxContentY) maxContentY = b.bottom;
+}
+for (final img in widget.images) {
+final b = img.getBounds();
+if (b.bottom > maxContentY) maxContentY = b.bottom;
+}
+
+int contentPages = (maxContentY / _basePageHeight).ceil();
+if (contentPages > _numPages) {
+_numPages = contentPages;
+while (widget.pageBackgrounds.length < _numPages) {
+widget.pageBackgrounds.add(null);
+}
+}
+}
+
 _pageHeight = _basePageHeight * _numPages;
 
 _transformationController.initialize(
@@ -342,19 +369,48 @@ _highlighterPrimaryColor,
 });
 }
 
-void _addPage(Size viewportSize) {
-setState(() {
-_numPages++;
-_pageHeight = _basePageHeight * _numPages;
-_transformationController.setOffset(
-Offset(_transformationController.offset.dx, -_pageHeight),
-viewportSize,
-_pageWidth,
-_pageHeight,
-);
-});
-_recordHistory();
-}
+  void _addPage(Size viewportSize) {
+    setState(() {
+      final insertIndex = _currentPageIndex + 1;
+      _numPages++;
+
+      if (insertIndex < widget.pageBackgrounds.length) {
+        widget.pageBackgrounds.insert(insertIndex, "blank");
+      } else {
+        widget.pageBackgrounds.add("blank");
+      }
+
+      final thresholdY = insertIndex * _basePageHeight;
+      final shiftDelta = Offset(0, _basePageHeight);
+
+      for (final stroke in widget.bottomLayerStrokes) {
+        if (stroke.getBounds().top >= thresholdY - 1.0) {
+          stroke.translate(shiftDelta);
+        }
+      }
+
+      for (final img in widget.images) {
+        if (img.position.dy >= thresholdY - 1.0) {
+          img.translate(shiftDelta);
+        }
+      }
+
+      widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
+
+      _pageHeight = _basePageHeight * _numPages;
+
+      _transformationController.setOffset(
+        Offset(_transformationController.offset.dx, -thresholdY),
+        viewportSize,
+        _pageWidth,
+        _pageHeight,
+      );
+    });
+
+    widget.bottomCanvasKey.currentState?.update();
+    _recordHistory();
+  }
+
 
 void _switchEraserType() {
 setState(() {

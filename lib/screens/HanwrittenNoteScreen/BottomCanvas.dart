@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/HandwrittenNote.dart';
+import '../../app_style.dart';
 import 'HandwritingPainter.dart';
 
 class BottomCanvas extends StatefulWidget {
@@ -29,6 +30,7 @@ class BottomCanvasState extends State<BottomCanvas> {
       painter: HandwritingPainter(
         strokes: widget.strokes,
         currentStroke: null,
+        backgroundColor: BG,
       ),
       child: const SizedBox.expand(),
     );

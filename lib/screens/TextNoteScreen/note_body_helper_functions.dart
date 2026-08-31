@@ -5,6 +5,8 @@ import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:markdown_quill/markdown_quill.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../../app_style.dart';
+
 bool isJson(String text) {
   if (text.trim().isEmpty) return false;
   try {
@@ -60,7 +62,7 @@ int getReadingTime(String text) {
 
 OutlineInputBorder note_border() {
   return OutlineInputBorder(
-    borderSide: BorderSide(color: Colors.blue, width: 2),
+    borderSide: BorderSide(color: accent, width: 2),
     borderRadius: BorderRadius.circular(4),
   );
 }

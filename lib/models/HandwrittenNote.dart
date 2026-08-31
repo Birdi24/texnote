@@ -218,10 +218,10 @@ class HandwrittenNote extends Note {
     required super.type,
     this.paperType = "blank",
     super.isFavorite = false,
-    this.pageBackgrounds = const [],
+    List<String?> pageBackgrounds = const [],
     this.pdfSourcePath = "",
     this.images = const [],
-  });
+  }) : pageBackgrounds = List<String?>.from(pageBackgrounds);
 
 
   String date_string() {
@@ -271,7 +271,7 @@ class HandwrittenNote extends Note {
         date: finalTime,
         type: NoteType.HandwrittenNote,
         paperType: data['paperType'] ?? "blank",
-        pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e?.toString()).toList() ?? [],
         images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? []
     );
     if (data['strokes'] != null) {
@@ -279,6 +279,30 @@ class HandwrittenNote extends Note {
           .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
           .toList();
     }
+    
+    // Ensure pageBackgrounds is never empty and covers all strokes/images
+    double maxY = 0;
+    for (final stroke in note.strokes) {
+      final b = stroke.getBounds();
+      if (b.bottom > maxY) maxY = b.bottom;
+    }
+    for (final img in note.images) {
+      final b = img.getBounds();
+      if (b.bottom > maxY) maxY = b.bottom;
+    }
+    
+    // Use 1000.0 as a default logical page height if we don't know the screen size
+    int requiredPages = (maxY / 1000.0).ceil();
+    if (requiredPages > note.pageBackgrounds.length) {
+      while (note.pageBackgrounds.length < requiredPages) {
+        note.pageBackgrounds.add(null);
+      }
+    }
+    
+    if (note.pageBackgrounds.isEmpty) {
+      note.pageBackgrounds.add(null);
+    }
+
     note.cover = data['cover'] ?? "1";
     return note;
   }
@@ -429,12 +453,12 @@ class HandwrittenNote extends Note {
                     topLeft: Radius.circular(20),
                     bottomLeft: Radius.circular(20),
                   ),
-                  child: ColoredBox(color: icon_color.withAlpha(25)),
+                  child: ColoredBox(color: BLACK.withAlpha(25)),
                 ),
               ),
               Positioned(
                   top: 0, left: 16, width: 2, height: 250,
-                  child: ColoredBox(color: Colors.white.withAlpha(50))
+                  child: ColoredBox(color: WHITE.withAlpha(50))
               )
             ],
           )
@@ -447,7 +471,7 @@ class HandwrittenNote extends Note {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: icon_color,
             fontSize: 15,
             fontWeight: FontWeight.w500,
@@ -516,7 +540,7 @@ class HandwrittenNote extends Note {
                 child: pw.Stack(
                   children: [
                     // Background Image
-                    if (pageBackgrounds.length > i && pageBackgrounds[i] != null)
+                    if (pageBackgrounds.length > i && pageBackgrounds[i] != null && pageBackgrounds[i] != "blank")
                       pw.Positioned.fill(
                         child: pw.Image(
                           pw.MemoryImage(File(pageBackgrounds[i]!).readAsBytesSync()),
@@ -610,7 +634,8 @@ class HandwrittenNote extends Note {
                                   canvas.lineTo(p.dx * scaleX, size.y - (p.dy - startY) * scaleY);
                                 }
                                 canvas.closePath();
-                                canvas.setFillColor(PdfColor.fromInt(stroke.color.value));
+                                final adaptiveColor = getAdaptiveStrokeColor(stroke.color, Colors.white);
+                                canvas.setFillColor(PdfColor.fromInt(adaptiveColor.value));
                                 canvas.fillPath();
                               }
                             }

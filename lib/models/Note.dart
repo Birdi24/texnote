@@ -71,5 +71,4 @@ abstract class Note {
 enum NoteType {
   HandwrittenNote,
   TextNote,
-  latex,
 }

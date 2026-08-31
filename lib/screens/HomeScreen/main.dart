@@ -12,12 +12,17 @@ import '../../models/Note.dart';
 import '../../models/favorites.dart';
 import '../../widgets/glass_container.dart';
 
+
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final ThemeManager themeManager;
+
+  const HomeScreen({
+    super.key,
+    required this.themeManager,
+  });
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
   List<Note> notes = [];
@@ -144,6 +149,8 @@ class _HomeScreenState extends State<HomeScreen>
       _inCollection = false;
     });
   }
+
+  get themeManager => widget.themeManager;
 
   // ---------------------------------------------------------------------------
   // NOTES
@@ -416,6 +423,7 @@ class _HomeScreenState extends State<HomeScreen>
                 screenWidth,
                 onSearchChanged,
                 _isSearching,
+                themeManager
               ),
 
               // ----------------------------------------------------------------

@@ -151,7 +151,7 @@ class Collection {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: icon_color,
             fontSize: 15,
             fontWeight: FontWeight.w500,

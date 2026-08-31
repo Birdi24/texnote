@@ -12,7 +12,8 @@ Widget note_body(BuildContext context, QuillController bodyController, double fo
 Widget rich_text_view(BuildContext context, QuillController bodyController, double font_size) {
   return Container(
     decoration: BoxDecoration(
-      border: Border.all(color: accent), borderRadius: BorderRadius.circular(5)
+      border: Border.all(color: accent), borderRadius: BorderRadius.circular(5),
+      color: BG
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
@@ -25,7 +26,7 @@ Widget rich_text_view(BuildContext context, QuillController bodyController, doub
           placeholder: 'Start your note here...',
           customStyles: DefaultStyles(
             placeHolder: DefaultTextBlockStyle(
-              AppStyles.bodytext.copyWith(fontSize: font_size, color: Colors.grey),
+              AppStyles.bodytext.copyWith(fontSize: font_size, color: text),
               const HorizontalSpacing(0, 0),
               const VerticalSpacing(0, 0),
               const VerticalSpacing(0, 0),

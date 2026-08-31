@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:texnote/widgets/full_color_picker.dart';
+import 'package:texnote/widgets/color_picker.dart';
 import 'package:texnote/widgets/glass_container.dart';
 import 'package:texnote/widgets/single_circle_button.dart';
 import 'package:texnote/widgets/table_picker.dart';
@@ -96,12 +96,12 @@ Widget color_button(BuildContext context, QuillController bodyController) {
                 backgroundColor: BG,
                 title: Text('Text Color', style: AppStyles.bodytext.copyWith(color: icon_color)),
                 content: SizedBox(
-                  height: 380,
+                  height: 420,
                   width: 300,
-                  child: FullColorPicker(
+                  child: ColorPicker(
                     initialColor: selectedColor,
                     history: textHistory,
-                    onColorChanged: (color) {
+                    onColorChanged: (color, identifier) {
                       selectedColor = color;
                     },
                   ),
@@ -117,7 +117,7 @@ Widget color_button(BuildContext context, QuillController bodyController) {
                         textHistory.insert(0, selectedColor);
                         if (textHistory.length > 6) textHistory.removeLast();
                       }
-                      bodyController.formatSelection(ColorAttribute('#${selectedColor.value.toRadixString(16).substring(2)}'));
+                      bodyController.formatSelection(ColorAttribute('#${selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}'));
                       Navigator.pop(context);
                     },
                     child: const Text('Apply'),
@@ -158,12 +158,12 @@ Widget highlight_button(BuildContext context, QuillController bodyController) {
                 backgroundColor: BG,
                 title: Text('Highlight Color', style: AppStyles.bodytext.copyWith(color: icon_color)),
                 content: SizedBox(
-                  height: 380,
+                  height: 420,
                   width: 300,
-                  child: FullColorPicker(
+                  child: ColorPicker(
                     initialColor: selectedColor,
                     history: highlightHistory,
-                    onColorChanged: (color) {
+                    onColorChanged: (color, identifier) {
                       selectedColor = color;
                     },
                   ),
@@ -175,11 +175,18 @@ Widget highlight_button(BuildContext context, QuillController bodyController) {
                   ),
                   TextButton(
                     onPressed: () {
+                      bodyController.formatSelection(Attribute.clone(Attribute.background, null));
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Remove Highlighter'),
+                  ),
+                  TextButton(
+                    onPressed: () {
                       if (!highlightHistory.contains(selectedColor)) {
                         highlightHistory.insert(0, selectedColor);
                         if (highlightHistory.length > 6) highlightHistory.removeLast();
                       }
-                      bodyController.formatSelection(BackgroundAttribute('#${selectedColor.value.toRadixString(16).substring(2)}'));
+                      bodyController.formatSelection(BackgroundAttribute('#${selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}'));
                       Navigator.pop(context);
                     },
                     child: const Text('Apply'),

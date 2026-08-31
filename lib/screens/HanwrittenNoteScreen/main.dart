@@ -61,29 +61,43 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
   Future<String?> _resolvePageBackground(int pageIndex) async {
     if (_pdfStore == null) return null;
 
+    // Page explicitly marked blank.
+    if (pageIndex < widget.note.pageBackgrounds.length &&
+        widget.note.pageBackgrounds[pageIndex] == "blank") {
+      return "blank";
+    }
+
+    // No entry means blank/new page.
+    if (pageIndex >= widget.note.pageBackgrounds.length) {
+      return "blank";
+    }
+
+    // Count PDF-backed pages before this page.
     int pdfPageIndex = 0;
+
     for (int i = 0; i < pageIndex; i++) {
-      if (i < widget.note.pageBackgrounds.length) {
-        if (widget.note.pageBackgrounds[i] != "blank") {
-          pdfPageIndex++;
-        }
-      } else {
+      final background = widget.note.pageBackgrounds[i];
+
+      if (background != "blank") {
         pdfPageIndex++;
       }
     }
 
     try {
-      final path = await _pdfStore!.pathForPage(pdfPageIndex + 1); // store is 1-based
-      if (pageIndex < widget.note.pageBackgrounds.length) {
-        widget.note.pageBackgrounds[pageIndex] = path; // cache result back onto the model
-      }
+      final path = await _pdfStore!.pathForPage(pdfPageIndex + 1);
+
+      widget.note.pageBackgrounds[pageIndex] = path;
+
       return path;
     } catch (e) {
-      debugPrint("PDF page resolution failed for pageIndex $pageIndex (PDF page $pdfPageIndex): $e");
-      return null;
+      debugPrint(
+        "PDF page resolution failed: "
+            "note page=$pageIndex, pdf page=${pdfPageIndex + 1}: $e",
+      );
+
+      return "blank";
     }
   }
-
   Future<void> save() async {
     if (!changed) return;
     

@@ -138,6 +138,12 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
   @override
   void didUpdateWidget(covariant _PageBackgroundImage oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.knownPath != widget.knownPath) {
+      _evict();
+      _resolvedPath = widget.knownPath;
+    }
+
     if (widget.inWindow && !oldWidget.inWindow) {
       _load();
     } else if (!widget.inWindow && oldWidget.inWindow) {
@@ -146,20 +152,41 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
   }
 
   Future<void> _load() async {
+    // Explicitly blank page — NEVER ask the resolver for a PDF page.
+    if (_resolvedPath == "blank") {
+      return;
+    }
+
     var path = _resolvedPath;
+
     if (path == null && widget.resolver != null && !_resolving) {
       _resolving = true;
-      path = await widget.resolver!(widget.pageIndex);
-      _resolving = false;
-      if (!mounted) return;
-      setState(() => _resolvedPath = path);
-      return; // setState triggers rebuild, which will create the FileImage
+
+      try {
+        path = await widget.resolver!(widget.pageIndex);
+
+        if (!mounted) return;
+
+        _resolvedPath = path;
+
+        if (path != null && path != "blank") {
+          _fileImage = FileImage(File(path));
+        }
+
+        setState(() {});
+      } finally {
+        _resolving = false;
+      }
+
+      return;
     }
+
     if (path != null && path != "blank" && mounted) {
-      setState(() => _fileImage = FileImage(File(path!)));
+      setState(() {
+        _fileImage = FileImage(File(path!));
+      });
     }
   }
-
   void _evict() {
     _fileImage?.evict();
     _fileImage = null;
@@ -173,6 +200,7 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
 
   @override
   Widget build(BuildContext context) {
+
     if (!widget.inWindow || _resolvedPath == null || _resolvedPath == "blank") {
       // Reserves layout space with no decode cost.
       return SizedBox(width: widget.width, height: widget.height);

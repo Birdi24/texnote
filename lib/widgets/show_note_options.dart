@@ -45,7 +45,7 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
 
                       Text(
                         textAlign: TextAlign.center,
-                        'Are you sure you want to delete\n"${notes[index].title}"?',
+                          notes[index].title.length > 25 ? 'Are you sure you want to delete\n"${notes[index].title.substring(0,22)}..."?' : 'Are you sure you want to delete\n"${notes[index].title}"?'
                       ),
 
                       const SizedBox(height: 20),

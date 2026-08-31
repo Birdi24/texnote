@@ -372,35 +372,43 @@ _highlighterPrimaryColor,
   void _addPage(Size viewportSize) {
     setState(() {
       final insertIndex = _currentPageIndex + 1;
+
       _numPages++;
 
-      if (insertIndex < widget.pageBackgrounds.length) {
-        widget.pageBackgrounds.insert(insertIndex, "blank");
-      } else {
-        widget.pageBackgrounds.add("blank");
-      }
+      widget.pageBackgrounds.insert(
+        insertIndex.clamp(0, widget.pageBackgrounds.length),
+        "blank",
+      );
 
       final thresholdY = insertIndex * _basePageHeight;
       final shiftDelta = Offset(0, _basePageHeight);
 
+      // Move existing strokes after the insertion point down.
       for (final stroke in widget.bottomLayerStrokes) {
         if (stroke.getBounds().top >= thresholdY - 1.0) {
           stroke.translate(shiftDelta);
         }
       }
 
+      // Move existing images after the insertion point down.
       for (final img in widget.images) {
         if (img.position.dy >= thresholdY - 1.0) {
           img.translate(shiftDelta);
         }
       }
 
-      widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
+      widget.topCanvasKey.currentState?.shiftContent(
+        thresholdY,
+        shiftDelta,
+      );
 
       _pageHeight = _basePageHeight * _numPages;
 
       _transformationController.setOffset(
-        Offset(_transformationController.offset.dx, -thresholdY),
+        Offset(
+          _transformationController.offset.dx,
+          -thresholdY,
+        ),
         viewportSize,
         _pageWidth,
         _pageHeight,

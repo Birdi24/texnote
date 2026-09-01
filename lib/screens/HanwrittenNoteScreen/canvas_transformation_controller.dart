@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' show Matrix4, Vector3;
 
 class CanvasTransformationController extends ChangeNotifier {
-  static const double minZoom = 1.0;
+  static const double minZoom = 0.6;
   static const double maxZoom = 6.0;
 
   double _referenceScale = 1.0;

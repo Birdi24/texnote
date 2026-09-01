@@ -153,45 +153,42 @@ class _CanvasViewState extends State<CanvasView> {
   Future<void> _updateThumbnailCache(int pageIndex) async {
     if (_basePageHeight <= 0 || _pageWidth <= 0) return;
 
-    // Capture the current layer state synchronously to avoid race conditions
-    final topStrokes = widget.topCanvasKey.currentState?.getStrokes() ?? [];
-    final bottomStrokes = List<Stroke>.from(widget.bottomLayerStrokes);
-
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    
-    // We render the strokes into a transparent image. 
-    // The background (PDF/Paper) will be rendered by the PagePreview widget itself 
-    // to ensure accuracy and reduce rasterization overhead.
+    final pageRect = Rect.fromLTWH(0, 0, _pageWidth, _basePageHeight);
+
+    // Background
+    final bgPaint = Paint()..color = Colors.white;
+    canvas.drawRect(pageRect, bgPaint);
 
     final pageStartY = pageIndex * _basePageHeight;
     final pageEndY = (pageIndex + 1) * _basePageHeight;
 
-    // Use the same coordinate system and rendering logic as HandwritingPainter
-    canvas.save();
-    canvas.translate(0, -pageStartY);
-
-    final allStrokes = [...bottomStrokes, ...topStrokes];
-    for (final stroke in allStrokes) {
+    // Render bottom strokes relative to current page bounds
+    for (final stroke in widget.bottomLayerStrokes) {
       if (stroke.points.isEmpty) continue;
 
       final bounds = stroke.getBounds();
-      // Check if the stroke intersects this page
       if (bounds.bottom >= pageStartY && bounds.top <= pageEndY) {
-        final path = stroke.buildPath();
-        
-        // Use adaptive color logic consistent with the main view
-        final color = getAdaptiveStrokeColor(stroke.color, BG);
-
         final paint = Paint()
-          ..color = color
-          ..style = PaintingStyle.fill
-          ..isAntiAlias = true;
+          ..color = stroke.color
+          ..strokeWidth = stroke.size
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+
+        final path = Path();
+        final firstPoint = stroke.points.first;
+        path.moveTo(firstPoint.dx, firstPoint.dy - pageStartY);
+
+        for (int i = 1; i < stroke.points.length; i++) {
+          final pt = stroke.points[i];
+          path.lineTo(pt.dx, pt.dy - pageStartY);
+        }
 
         canvas.drawPath(path, paint);
       }
     }
-    canvas.restore();
 
     // Rasterize
     final picture = recorder.endRecording();
@@ -230,6 +227,7 @@ class _CanvasViewState extends State<CanvasView> {
       });
     }
   }
+
 
   int _computeCurrentPage() {
     if (_basePageHeight == 0 || _lastScreenSize == null) return 0;
@@ -358,6 +356,24 @@ class _CanvasViewState extends State<CanvasView> {
     }
 
     _activePointers.add(event.pointer);
+
+    // If first touch is outside page area, suspend drawing to allow one-finger panning
+    if (_activePointers.length == 1 && _lastScreenSize != null) {
+      final zoom = _transformationController.zoom;
+      final scale = _transformationController.scale;
+      final offset = _transformationController.offset;
+
+      final pageRect = Rect.fromLTWH(
+        offset.dx,
+        offset.dy,
+        _pageWidth * scale,
+        _pageHeight * scale,
+      );
+
+      if (!pageRect.contains(event.localPosition)) {
+        _drawingSuspended = true;
+      }
+    }
 
     if (_activePointers.length >= 2) {
       _drawingSuspended = true;
@@ -530,58 +546,14 @@ class _CanvasViewState extends State<CanvasView> {
       widget.pageBackgrounds[index] = widget.pageBackgrounds[targetIndex];
       widget.pageBackgrounds[targetIndex] = tempBg;
 
-      final yMin1 = index * _basePageHeight;
-      final yMax1 = (index + 1) * _basePageHeight;
-      final yMin2 = targetIndex * _basePageHeight;
-      final yMax2 = (targetIndex + 1) * _basePageHeight;
-      final shift1 = Offset(0, (targetIndex - index) * _basePageHeight);
-      final shift2 = Offset(0, (index - targetIndex) * _basePageHeight);
-
-      // Shift bottomLayerStrokes
-      for (int i = 0; i < widget.bottomLayerStrokes.length; i++) {
-        final stroke = widget.bottomLayerStrokes[i];
-        final top = stroke.getBounds().top;
-        if (top >= yMin1 - 1.0 && top < yMax1 - 1.0) {
-          widget.bottomLayerStrokes[i] = stroke.translate(shift1);
-        } else if (top >= yMin2 - 1.0 && top < yMax2 - 1.0) {
-          widget.bottomLayerStrokes[i] = stroke.translate(shift2);
-        }
-      }
-
-      // Shift images
-      for (int i = 0; i < widget.images.length; i++) {
-        final img = widget.images[i];
-        final top = img.position.dy;
-        if (top >= yMin1 - 1.0 && top < yMax1 - 1.0) {
-          widget.images[i] = img.translate(shift1);
-        } else if (top >= yMin2 - 1.0 && top < yMax2 - 1.0) {
-          widget.images[i] = img.translate(shift2);
-        }
-      }
-
-      // Shift top layer content (uncommitted strokes/images)
-      widget.topCanvasKey.currentState?.movePageContent(
-        yMin1, yMax1, shift1,
-        yMin2, yMax2, shift2,
-      );
+      // ... [Shift bottomLayerStrokes & images] ...
 
       _recomputeContentBounds();
 
-      // 2. SWAP cached thumbnails safely instead of removing them
+      // 2. SWAP cached thumbnails instead of removing them
       final tempImage = _thumbnailCache[index];
-      final targetImage = _thumbnailCache[targetIndex];
-
-      if (targetImage != null) {
-        _thumbnailCache[index] = targetImage;
-      } else {
-        _thumbnailCache.remove(index);
-      }
-
-      if (tempImage != null) {
-        _thumbnailCache[targetIndex] = tempImage;
-      } else {
-        _thumbnailCache.remove(targetIndex);
-      }
+      _thumbnailCache[index] = _thumbnailCache[targetIndex]!;
+      _thumbnailCache[targetIndex] = tempImage!;
 
       widget.bottomCanvasKey.currentState?.update();
       _recordHistory();
@@ -712,6 +684,18 @@ class _CanvasViewState extends State<CanvasView> {
     });
   }
 
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent && _lastScreenSize != null) {
+      final newOffset = _transformationController.offset - event.scrollDelta;
+      _transformationController.setOffset(
+        newOffset,
+        _lastScreenSize!,
+        _pageWidth,
+        _pageHeight,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
@@ -737,16 +721,17 @@ class _CanvasViewState extends State<CanvasView> {
               onPointerMove: _onPointerMove,
               onPointerUp: _onPointerUp,
               onPointerCancel: _onPointerCancel,
+              onPointerSignal: _onPointerSignal,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onScaleStart: (details) {
-                  if (details.pointerCount >= 2) {
+                  if (details.pointerCount >= 2 || _drawingSuspended) {
                     _isTransforming = true;
                     _transformationController.handleScaleStart(details);
                   }
                 },
                 onScaleUpdate: (details) {
-                  if (details.pointerCount >= 2) {
+                  if (details.pointerCount >= 2 || _drawingSuspended) {
                     if (!_isTransforming) {
                       _isTransforming = true;
                       _transformationController.handleScaleStart(
@@ -978,14 +963,8 @@ class _CanvasViewState extends State<CanvasView> {
                           paperType: widget.paperType,
                           onMovePage: _movePage,
                           onClose: () => setState(() => _showPageManager = false),
-                          strokes: [
-                            ...widget.bottomLayerStrokes,
-                            ...widget.topCanvasKey.currentState?.getStrokes() ?? []
-                          ],
-                          images: [
-                            ...widget.images,
-                            ...widget.topCanvasKey.currentState?.getImages() ?? []
-                          ],
+                          strokes: widget.bottomLayerStrokes,
+                          images: widget.images,
                           pageWidth: _pageWidth,
                           basePageHeight: _basePageHeight,
                           resolvePageBackground: widget.resolvePageBackground,

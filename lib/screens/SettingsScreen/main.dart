@@ -233,28 +233,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _themeCard(
               theme: AppThemes.defaultTheme,
               index: 0,
-              name: 'Light',
+              name: 'Pure Light',
               width: cardWidth,
             ),
 
             _themeCard(
               theme: AppThemes.darkTheme,
               index: 1,
-              name: 'Dark',
+              name: 'Ash Dark',
               width: cardWidth,
             ),
 
             _themeCard(
               theme: AppThemes.redTheme,
               index: 2,
-              name: 'Red',
+              name: 'Vampire Red',
               width: cardWidth,
             ),
 
             _themeCard(
               theme: AppThemes.greenTheme,
               index: 3,
-              name: 'Green',
+              name: 'Sage Green',
               width: cardWidth,
             ),
 

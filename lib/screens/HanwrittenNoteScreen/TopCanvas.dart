@@ -243,25 +243,77 @@ class TopCanvasState extends State<TopCanvas> {
 
   void shiftContent(double thresholdY, Offset delta) {
     setState(() {
-      for (final stroke in _toplayer) {
+      for (int i = 0; i < _toplayer.length; i++) {
+        final stroke = _toplayer[i];
         if (stroke.getBounds().top >= thresholdY - 1.0) {
-          stroke.translate(delta);
+          _toplayer[i] = stroke.translate(delta);
         }
       }
-      for (final img in _topLayerImages) {
+      for (int i = 0; i < _topLayerImages.length; i++) {
+        final img = _topLayerImages[i];
         if (img.position.dy >= thresholdY - 1.0) {
-          img.translate(delta);
+          _topLayerImages[i] = img.translate(delta);
         }
       }
 
-      for (final stroke in _lassoManager.selectedStrokes) {
+      for (int i = 0; i < _lassoManager.selectedStrokes.length; i++) {
+        final stroke = _lassoManager.selectedStrokes[i];
         if (stroke.getBounds().top >= thresholdY - 1.0) {
-          stroke.translate(delta);
+          _lassoManager.selectedStrokes[i] = stroke.translate(delta);
         }
       }
-      for (final img in _lassoManager.selectedImages) {
+      for (int i = 0; i < _lassoManager.selectedImages.length; i++) {
+        final img = _lassoManager.selectedImages[i];
         if (img.position.dy >= thresholdY - 1.0) {
-          img.translate(delta);
+          _lassoManager.selectedImages[i] = img.translate(delta);
+        }
+      }
+      _lassoManager.updateSelectionRect();
+    });
+  }
+
+  void movePageContent(
+      double yMin1, double yMax1, Offset shift1,
+      double yMin2, double yMax2, Offset shift2,
+      ) {
+    setState(() {
+      for (int i = 0; i < _toplayer.length; i++) {
+        final stroke = _toplayer[i];
+        double top = stroke.getBounds().top;
+        if (top >= yMin1 - 1.0 && top < yMax1 - 1.0) {
+          _toplayer[i] = stroke.translate(shift1);
+        } else if (top >= yMin2 - 1.0 && top < yMax2 - 1.0) {
+          _toplayer[i] = stroke.translate(shift2);
+        }
+      }
+
+      for (int i = 0; i < _lassoManager.selectedStrokes.length; i++) {
+        final stroke = _lassoManager.selectedStrokes[i];
+        double top = stroke.getBounds().top;
+        if (top >= yMin1 - 1.0 && top < yMax1 - 1.0) {
+          _lassoManager.selectedStrokes[i] = stroke.translate(shift1);
+        } else if (top >= yMin2 - 1.0 && top < yMax2 - 1.0) {
+          _lassoManager.selectedStrokes[i] = stroke.translate(shift2);
+        }
+      }
+
+      for (int i = 0; i < _topLayerImages.length; i++) {
+        final img = _topLayerImages[i];
+        double top = img.position.dy;
+        if (top >= yMin1 - 1.0 && top < yMax1 - 1.0) {
+          _topLayerImages[i] = img.translate(shift1);
+        } else if (top >= yMin2 - 1.0 && top < yMax2 - 1.0) {
+          _topLayerImages[i] = img.translate(shift2);
+        }
+      }
+
+      for (int i = 0; i < _lassoManager.selectedImages.length; i++) {
+        final img = _lassoManager.selectedImages[i];
+        double top = img.position.dy;
+        if (top >= yMin1 - 1.0 && top < yMax1 - 1.0) {
+          _lassoManager.selectedImages[i] = img.translate(shift1);
+        } else if (top >= yMin2 - 1.0 && top < yMax2 - 1.0) {
+          _lassoManager.selectedImages[i] = img.translate(shift2);
         }
       }
       _lassoManager.updateSelectionRect();

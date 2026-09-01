@@ -111,11 +111,11 @@ class LassoManager {
 
   void handleMove(Offset delta, VoidCallback onChanged) {
     if (selectedStrokes.isEmpty && selectedImages.isEmpty) return;
-    for (final stroke in selectedStrokes) {
-      stroke.translate(delta);
+    for (int i = 0; i < selectedStrokes.length; i++) {
+      selectedStrokes[i] = selectedStrokes[i].translate(delta);
     }
-    for (final img in selectedImages) {
-      img.translate(delta);
+    for (int i = 0; i < selectedImages.length; i++) {
+      selectedImages[i] = selectedImages[i].translate(delta);
     }
     updateSelectionRect();
     onChanged();
@@ -130,11 +130,11 @@ class LassoManager {
 
     if (oldDist > 0) {
       final scaleFactor = newDist / oldDist;
-      for (final stroke in selectedStrokes) {
-        stroke.scale(scaleFactor, center);
+      for (int i = 0; i < selectedStrokes.length; i++) {
+        selectedStrokes[i] = selectedStrokes[i].scale(scaleFactor, center);
       }
-      for (final img in selectedImages) {
-        img.scaleFromOrigin(scaleFactor, center);
+      for (int i = 0; i < selectedImages.length; i++) {
+        selectedImages[i] = selectedImages[i].scaleFromOrigin(scaleFactor, center);
       }
       updateSelectionRect();
       onChanged();
@@ -144,17 +144,9 @@ class LassoManager {
   void duplicateSelectedItems(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, VoidCallback onChanged) {
     if (selectedStrokes.isEmpty && selectedImages.isEmpty) return;
 
-    final List<Stroke> strokeCopies = selectedStrokes.map((s) => s.copy()).toList();
-    final List<ImageData> imageCopies = selectedImages.map((i) => i.copy()).toList();
+    final List<Stroke> strokeCopies = selectedStrokes.map((s) => s.copy().translate(const Offset(20, 20))).toList();
+    final List<ImageData> imageCopies = selectedImages.map((i) => i.copy().translate(const Offset(20, 20))).toList();
     
-    const Offset offset = Offset(20, 20);
-    for (final stroke in strokeCopies) {
-      stroke.translate(offset);
-    }
-    for (final img in imageCopies) {
-      img.translate(offset);
-    }
-
     topLayerStrokes.addAll(selectedStrokes);
     selectedStrokes = strokeCopies;
 

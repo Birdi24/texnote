@@ -59,6 +59,46 @@ Widget bold_button(BuildContext context, QuillController bodyController){
   return base_button(bodyController, Attribute.bold, LucideIcons.bold, context);
 }
 
+Widget undo_button(BuildContext context, QuillController bodyController) {
+  return ListenableBuilder(
+    listenable: bodyController,
+    builder: (context, _) {
+      final canUndo = bodyController.hasUndo;
+      return single_circle_button(
+        LucideIcons.undo_2,
+        20.0,
+        canUndo ? 90 : 40,
+        "undo",
+            () { if (canUndo) {bodyController.undo();}},
+        context,
+        MediaQuery.of(context).size.width,
+        button_width: 35.0,
+        bgAlpha: 160,
+      );
+    },
+  );
+}
+
+Widget redo_button(BuildContext context, QuillController bodyController) {
+  return ListenableBuilder(
+    listenable: bodyController,
+    builder: (context, _) {
+      final canRedo = bodyController.hasRedo;
+      return single_circle_button(
+        LucideIcons.redo_2,
+        20.0,
+        canRedo ? 90 : 40,
+        "redo",
+            () { if (canRedo) {bodyController.redo();}},
+        context,
+        MediaQuery.of(context).size.width,
+        button_width: 35.0,
+        bgAlpha: 160,
+      );
+    },
+  );
+}
+
 Widget italic_button(BuildContext context, QuillController bodyController) {
   return base_button(bodyController, Attribute.italic, LucideIcons.italic, context);
 }
@@ -92,7 +132,7 @@ Widget color_button(BuildContext context, QuillController bodyController) {
             context: context,
             builder: (context) {
               Color selectedColor = currentColor;
-              return AlertDialog(
+              return SingleChildScrollView( child: AlertDialog(
                 backgroundColor: BG,
                 title: Text('Text Color', style: AppStyles.bodytext.copyWith(color: icon_color)),
                 content: SizedBox(
@@ -123,7 +163,7 @@ Widget color_button(BuildContext context, QuillController bodyController) {
                     child: const Text('Apply'),
                   ),
                 ],
-              );
+              ),);
             },
           );
         },
@@ -154,7 +194,7 @@ Widget highlight_button(BuildContext context, QuillController bodyController) {
             context: context,
             builder: (context) {
               Color selectedColor = currentColor == Colors.transparent ? Colors.yellow : currentColor;
-              return AlertDialog(
+              return SingleChildScrollView(child: AlertDialog(
                 backgroundColor: BG,
                 title: Text('Highlight Color', style: AppStyles.bodytext.copyWith(color: icon_color)),
                 content: SizedBox(
@@ -192,7 +232,7 @@ Widget highlight_button(BuildContext context, QuillController bodyController) {
                     child: const Text('Apply'),
                   ),
                 ],
-              );
+              ));
             },
           );
         },

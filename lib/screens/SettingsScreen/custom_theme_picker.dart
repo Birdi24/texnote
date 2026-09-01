@@ -90,10 +90,10 @@ borderRadius: BorderRadius.circular(18),
 child: Container(
 padding: const EdgeInsets.all(14),
 decoration: BoxDecoration(
-color: _iconColor.withOpacity(0.05),
+color: BG,
 borderRadius: BorderRadius.circular(18),
 border: Border.all(
-color: _iconColor.withOpacity(0.08),
+color: _iconColor,
 ),
 ),
 child: Row(
@@ -105,7 +105,7 @@ decoration: BoxDecoration(
 color: color,
 borderRadius: BorderRadius.circular(15),
 border: Border.all(
-color: _iconColor.withOpacity(0.15),
+color: _iconColor,
 ),
 ),
 ),
@@ -130,7 +130,7 @@ const SizedBox(height: 3),
 Text(
 description,
 style: TextStyle(
-color: _iconColor.withOpacity(0.5),
+color: _iconColor,
 fontSize: 12,
 ),
 ),
@@ -151,7 +151,7 @@ fontWeight: FontWeight.w600,
 
 Icon(
 Icons.chevron_right,
-color: _iconColor.withAlpha(130),
+color: _iconColor,
 ),
 ],
 ),
@@ -169,7 +169,7 @@ color: _iconColor.withAlpha(130),
         color: _background,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: _iconColor.withOpacity(0.12),
+          color: _iconColor,
         ),
         boxShadow: [
           BoxShadow(
@@ -218,7 +218,7 @@ color: _iconColor.withAlpha(130),
           Text(
             'This is a preview of your custom theme.',
             style: TextStyle(
-              color: _text.withOpacity(0.55),
+              color: _text,
               fontSize: 13,
             ),
           ),
@@ -248,7 +248,7 @@ color: _iconColor.withAlpha(130),
                   width: 60,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: _accent.withOpacity(0.3),
+                    color: _accent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -365,7 +365,7 @@ const SizedBox(height: 12),
 _colorOption(
 title: 'Background',
 description: 'Main app background',
-color: _background,
+color: BG,
 onTap: () {
 _pickColor(
 title: 'Background',
@@ -569,8 +569,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           color: icon_color,
         ),
       ),
-      content: SizedBox(
-        height: 480,
+      content: SingleChildScrollView(child:SizedBox(
+        height: 420,
         width: 300,
         child: ColorPicker(
           initialColor: widget.initialColor,
@@ -580,11 +580,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
             selectedColor = color;
           },
         ),
-      ),
+      ),),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: TextStyle(color: icon_color.withOpacity(0.7))),
+          child: Text('Cancel', style: TextStyle(color: icon_color)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, selectedColor),

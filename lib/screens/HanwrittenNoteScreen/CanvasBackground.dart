@@ -37,7 +37,7 @@ class CanvasBackground extends StatelessWidget {
     this.pageBackgrounds = const [],
     this.resolvePageBackground,
     this.currentPage = 0,
-    this.windowRadius = 2,
+    this.windowRadius = 1,
   });
 
   @override

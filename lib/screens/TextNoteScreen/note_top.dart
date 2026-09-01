@@ -7,7 +7,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:texnote/screens/TextNoteScreen/text_manipulation_buttons.dart';
 import 'package:texnote/widgets/glass_container.dart';
 import 'package:texnote/widgets/single_circle_button.dart';
-
+import '../../app_style.dart';
 import '../../widgets/title_label.dart';
 
 Widget note_top(context, changed, Future<void> Function() save,
@@ -44,6 +44,9 @@ Widget text_view(context, changed, Future<void> Function() save,
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     spacing: 10,
                     children: [
+                      undo_button(context, bodyController),
+                      redo_button(context, bodyController),
+                      VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
                       bold_button(context, bodyController),
                       italic_button(context, bodyController),
                       color_button(context, bodyController),

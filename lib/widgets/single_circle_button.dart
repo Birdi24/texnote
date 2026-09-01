@@ -24,7 +24,6 @@ Widget single_circle_button(
       color: Colors.transparent,
       child: InkWell(
         onTap: () async {
-          debugPrint("Add button hit");
           await function();
         },
         customBorder: const CircleBorder(),

@@ -11,6 +11,7 @@ class CanvasScrollbar extends StatelessWidget {
   final double basePageHeight;
   final double safeHeight;
   final Size viewportSize;
+  final VoidCallback? onTogglePageManager;
 
   const CanvasScrollbar({
     super.key,
@@ -21,6 +22,7 @@ class CanvasScrollbar extends StatelessWidget {
     required this.basePageHeight,
     required this.safeHeight,
     required this.viewportSize,
+    this.onTogglePageManager,
   });
 
   @override
@@ -98,16 +100,19 @@ class CanvasScrollbar extends StatelessWidget {
                 Positioned(
                   top: scrollbarHandleY,
                   right: 0,
-                  child: glassContainer(
-                    width: 50,
-                    height: handleHeight,
-                    radius: 12,
-                    child: Center(
-                      child: Text(
-                        "$currentPage",
-                        style: AppStyles.icon_text.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                  child: GestureDetector(
+                    onTap: onTogglePageManager,
+                    child: glassContainer(
+                      width: 50,
+                      height: handleHeight,
+                      radius: 12,
+                      child: Center(
+                        child: Text(
+                          "$currentPage",
+                          style: AppStyles.icon_text.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                     ),

@@ -34,19 +34,24 @@ class Stroke {
     this.hasEndCap = true,
   });
 
-  void translate(Offset delta) {
-    for (int i = 0; i < points.length; i++) {
-      points[i] = points[i] + delta;
-    }
-    invalidateCache();
+  Stroke translate(Offset delta) {
+    return Stroke(
+      points: points.map((p) => p + delta).toList(),
+      size: size,
+      color: color,
+      hasStartCap: hasStartCap,
+      hasEndCap: hasEndCap,
+    );
   }
 
-  void scale(double scale, Offset origin) {
-    for (int i = 0; i < points.length; i++) {
-      points[i] = origin + (points[i] - origin) * scale;
-    }
-    size *= scale;
-    invalidateCache();
+  Stroke scale(double scaleFactor, Offset origin) {
+    return Stroke(
+      points: points.map((p) => origin + (p - origin) * scaleFactor).toList(),
+      size: size * scaleFactor,
+      color: color,
+      hasStartCap: hasStartCap,
+      hasEndCap: hasEndCap,
+    );
   }
 
   Rect getBounds() {
@@ -155,14 +160,24 @@ class ImageData {
     this.height = 200.0,
   });
 
-  void translate(Offset delta) {
-    position += delta;
+  ImageData translate(Offset delta) {
+    return ImageData(
+      position: position + delta,
+      imagePath: imagePath,
+      scale: scale,
+      width: width,
+      height: height,
+    );
   }
 
-  void scaleFromOrigin(double scaleFactor, Offset origin) {
-    position = origin + (position - origin) * scaleFactor;
-    width *= scaleFactor;
-    height *= scaleFactor;
+  ImageData scaleFromOrigin(double scaleFactor, Offset origin) {
+    return ImageData(
+      position: origin + (position - origin) * scaleFactor,
+      imagePath: imagePath,
+      scale: scale,
+      width: width * scaleFactor,
+      height: height * scaleFactor,
+    );
   }
 
   Rect getBounds() {

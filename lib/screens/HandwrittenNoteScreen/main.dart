@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import '../../models/ImageData.dart';
@@ -26,7 +27,13 @@ class HandwrittenNotePage extends StatefulWidget {
 }
 
 class _HandwrittenNotePage extends State<HandwrittenNotePage> {
+  // Timer for auto-saving the note
+  Timer? _autoSaveTimer;
+
+  // Bottom canvas holds rarely refreshing parts of the note
   final GlobalKey<BottomCanvasState> _bottomCanvasKey = GlobalKey<BottomCanvasState>();
+
+  // Top canvas holds frequently refreshing parts of the note, like the last 50 strokes
   final GlobalKey<TopCanvasState> _topCanvasKey = GlobalKey<TopCanvasState>();
 
   final List<Stroke> bottomlayer = [];
@@ -39,6 +46,7 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
     super.initState();
     old_title = widget.note.title;
     bottomlayer.addAll(widget.note.strokes);
+    _autoSaveTimer = Timer.periodic( const Duration(minutes: 1), (_) => save(),);
 
     if (widget.note.pdfSourcePath.isNotEmpty) {
       _pdfStore = LazyPdfPageStore(
@@ -51,15 +59,12 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
   @override
   void dispose() {
     _pdfStore?.dispose();
+    _autoSaveTimer?.cancel();
     super.dispose();
   }
 
   void _markChanged() {
-    if (!changed) {
-      setState(() {
-        changed = true;
-      });
-    }
+    if (!changed) {setState(() {changed = true;});}
   }
 
   Future<String?> _resolvePageBackground(int pageIndex) async {
@@ -79,33 +84,28 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
     // Count PDF-backed pages before this page.
     int pdfPageIndex = 0;
 
+    // Skip blank pages as they were added by the user
     for (int i = 0; i < pageIndex; i++) {
       final background = widget.note.pageBackgrounds[i];
-
-      if (background != "blank") {
-        pdfPageIndex++;
-      }
+      if (background != "blank") {pdfPageIndex++;}
     }
 
+    // if its a PDF page, then try to resolve it
     try {
       final path = await _pdfStore!.pathForPage(pdfPageIndex + 1);
-
       widget.note.pageBackgrounds[pageIndex] = path;
 
       return path;
     } catch (e) {
-      debugPrint(
-        "PDF page resolution failed: "
-            "note page=$pageIndex, pdf page=${pdfPageIndex + 1}: $e",
-      );
-
+      debugPrint("PDF page resolution failed: note page=$pageIndex, pdf page=${pdfPageIndex + 1}: $e",);
       return "blank";
     }
   }
+
   Future<void> save() async {
     if (!changed) return;
     
-    // 1. Move everything from the volatile top layer to the persistent bottom layer
+    // Move everything from the volatile top layer to the persistent bottom layer
     final topStrokes = _topCanvasKey.currentState?.getStrokes() ?? [];
     final topImages = _topCanvasKey.currentState?.getImages() ?? [];
     final topTexts = _topCanvasKey.currentState?.getTexts() ?? [];
@@ -120,7 +120,7 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
       widget.note.texts.addAll(topTexts);
     }
     
-    // 2. Synchronize the note model with our local bottom layer
+    // Synchronize the note model with our local bottom layer
     widget.note.strokes = List<Stroke>.from(bottomlayer);
     
     await widget.note.save(old_title);
@@ -134,6 +134,7 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
     old_title = widget.note.title;
   }
 
+  /// add everything from the top layer to the bottom layer
   void _commitToBottom(List<Stroke> strokes, List<ImageData> images, List<TextData> texts) {
     setState(() {
       bottomlayer.addAll(strokes);
@@ -157,7 +158,7 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
       child: Scaffold(
         backgroundColor: BG.withAlpha(252),
   
-          body: LayoutBuilder(builder: (context, scaffoldConstraints) => SafeArea(
+          body: SafeArea(
             child: LayoutBuilder(builder: (context, safeAreaConstraints) {
             return CanvasView(
               bottomLayerStrokes: bottomlayer,
@@ -175,7 +176,6 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> {
             );
             },
           ),
-        ),
         ),
       ),
     );

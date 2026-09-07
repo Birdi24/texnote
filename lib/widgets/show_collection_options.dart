@@ -19,6 +19,7 @@ void show_collection_options(
 
   showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
     builder: (context) {
@@ -109,11 +110,11 @@ void show_collection_options(
                 ListTile(
                   leading: const Icon(
                     LucideIcons.trash_2,
-                    color: Colors.red,
+                    color: RED,
                   ),
                   title: const Text(
                     'Delete collection',
-                    style: TextStyle(color: Colors.red),
+                    style: TextStyle(color: RED),
                   ),
                   onTap: () async {
                     Navigator.pop(context);
@@ -127,7 +128,7 @@ void show_collection_options(
                   },
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: MediaQuery.of(context).padding.bottom )
               ],
             ),
           ),
@@ -272,7 +273,7 @@ void change_collection_color_dialog(
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: collection_color(currentSelected),
-                              foregroundColor: Colors.white,
+                              foregroundColor: WHITE,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () async {

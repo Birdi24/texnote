@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:texnote/models/HandwrittenNote.dart';
-import 'package:texnote/models/Note.dart';
-import 'package:texnote/screens/HanwrittenNoteScreen/main.dart';
+import 'package:birdwrite/models/HandwrittenNote.dart';
+import 'package:birdwrite/models/Note.dart';
+import 'package:birdwrite/screens/HandwrittenNoteScreen/main.dart';
 import '../app_style.dart';
 import 'color_picker.dart';
 import 'glass_container.dart';

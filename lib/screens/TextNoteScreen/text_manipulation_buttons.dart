@@ -2,10 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:texnote/widgets/color_picker.dart';
-import 'package:texnote/widgets/glass_container.dart';
-import 'package:texnote/widgets/single_circle_button.dart';
-import 'package:texnote/widgets/table_picker.dart';
+import 'package:birdwrite/widgets/color_picker.dart';
+import 'package:birdwrite/widgets/glass_container.dart';
+import 'package:birdwrite/widgets/single_circle_button.dart';
 import '../../../app_style.dart';
 
 final List<Color> textHistory = [];

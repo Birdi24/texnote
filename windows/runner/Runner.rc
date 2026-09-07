@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.bird" "\0"
-            VALUE "FileDescription", "texnote" "\0"
+            VALUE "FileDescription", "BirdWrite" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "texnote" "\0"
+            VALUE "InternalName", "birdwrite" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.bird. All rights reserved." "\0"
-            VALUE "OriginalFilename", "texnote.exe" "\0"
-            VALUE "ProductName", "texnote" "\0"
+            VALUE "OriginalFilename", "birdwrite.exe" "\0"
+            VALUE "ProductName", "BirdWrite" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

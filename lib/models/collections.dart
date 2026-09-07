@@ -7,6 +7,8 @@ import '../app_style.dart';
 import 'Note.dart';
 import 'TextNote.dart';
 
+
+/// Represents a collection of notes.
 class Collection {
   String title;
   String color;
@@ -18,7 +20,7 @@ class Collection {
     if (notes.contains(note)) {return false;}
     notes.add(note); return true;
   }
-  bool remove_from_collections(TextNote note){
+  bool remove_from_collections(Note note){
     if (!notes.contains(note)) {return false;}
     notes.remove(note); return true;
   }
@@ -116,29 +118,31 @@ class Collection {
     }
   }
 
+  /// display a collection on Home screen
   Widget display() {
     return Column(
       children: [
-        Container(
-          width: 180,
-          height: 250,
-          padding: const EdgeInsets.only(top: 50),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: collection_color(color),
-            border: Border.all(
-              color: icon_color,
-              width: 2,
-            ),
-          ),
+        AspectRatio(
+          aspectRatio: 0.72,
           child: Container(
-            alignment: Alignment.bottomCenter,
-            width: double.infinity,
+            padding: const EdgeInsets.only(top: 50),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(17),
+              borderRadius: BorderRadius.circular(20),
+              color: collection_color(color),
               border: Border.all(
                 color: icon_color,
                 width: 2,
+              ),
+            ),
+            child: Container(
+              alignment: Alignment.bottomCenter,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(17),
+                border: Border.all(
+                  color: icon_color,
+                  width: 2,
+                ),
               ),
             ),
           ),

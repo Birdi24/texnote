@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'package:texnote/models/HandwrittenNote.dart';
+import 'package:birdwrite/models/HandwrittenNote.dart';
 
 import '../app_style.dart';
 import '../models/Note.dart';
@@ -90,6 +90,7 @@ void show_note_options(
 
   showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
     builder: (context) {
@@ -394,7 +395,7 @@ void show_note_options(
                   },
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: MediaQuery.of(context).padding.bottom )
               ],
             ),
           ),

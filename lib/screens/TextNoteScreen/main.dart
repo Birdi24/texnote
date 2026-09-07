@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:dart_quill_delta/dart_quill_delta.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,30 +11,41 @@ import 'note_botton.dart';
 import 'note_top.dart';
 import 'note_body_helper_functions.dart';
 
+/// Stateful because the text changes and the theme changes
 class TextNoteScreen extends StatefulWidget {
   TextNote note;
-  
   TextNoteScreen(this.note);
-
   @override
   State<TextNoteScreen> createState() => _TextNoteScreenState();
 }
 
 class _TextNoteScreenState extends State<TextNoteScreen> {
+  // Timer for auto-saving the note
   Timer? _autoSaveTimer;
+
+  // Controller for the title of the note
   var titleController = TextEditingController();
+
+  // Rich text controller for the body of the note
   late QuillController bodyController;
+
+  // old title of the note, if title was changed, it deletes the previous note
   String old_title = "";
+
+  // Whether the note has been changed, if so, it will be saved
   bool changed = false;
+
   String? _lastSaved;
   final _currentTime = DateFormat('MMM d, yyyy - h:mm a').format(DateTime.now());
+
   double font_size = 16;
+
   @override
   void initState() {
     super.initState();
     titleController = TextEditingController(text: widget.note.title,);
     bodyController = QuillController(
-      document: Document.fromDelta(markdownToDelta(widget.note.body)),
+      document: Document.fromDelta(Delta.fromJson(jsonDecode(widget.note.body))),
       selection: const TextSelection.collapsed(offset: 0),
     );
     titleController.addListener(_markChanged);

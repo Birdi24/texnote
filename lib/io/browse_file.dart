@@ -14,41 +14,7 @@ import '../models/TextNote.dart';
 class FileOpenerScreen {
   final Saf _saf = Saf();
 
-  Future<Note?> browseFiles() async {
-    try {
-      // Open Android's native file picker
-      final pickedFile = await _saf.pickFile(mimeTypes: ['text/plain']);
-      // User cancelled
-      if (pickedFile == null) {
-        print("User cancelled the file picker.");
-        return null;
-      }
-      print("Selected File Name: ${pickedFile.name}");
-      print("Selected File Size: ${pickedFile.length} bytes");
-      // Store the Android SAF URI, NOT a temporary file path.
-      final String fileUri = pickedFile.uri;
-      print(
-        "Original File URI: $fileUri",
-      ); // Read the file directly from its original location
-      final bytes = await _saf.readFileBytes(fileUri);
-      final body = utf8.decode(bytes);
-      final title = pickedFile.name.replaceFirst(RegExp(r'\.[^.]+$'), '');
-      final finalTime = DateTime.fromMillisecondsSinceEpoch(
-        pickedFile.lastModified,
-      );
-      return TextNote(
-        title: title,
-        body: body,
-        path: fileUri,
-        date: finalTime,
-        type: NoteType.TextNote,
-      );
-    } catch (e) {
-      print("Error while executing browseFiles: $e");
-      return null;
-    }
-  }
-
+  // For importing PDFs into the app
   Future<HandwrittenNote?> importPdf() async {
     try {
       final pickedFile = await _saf.pickFile(mimeTypes: ['application/pdf']);
@@ -81,7 +47,6 @@ class FileOpenerScreen {
         path: notePath,
         type: NoteType.HandwrittenNote,
         pdfSourcePath: pdfPath,
-        // new field
         pageBackgrounds: List<String?>.filled(
           pagesCount,
           null,
@@ -97,6 +62,7 @@ class FileOpenerScreen {
   }
 }
 
+// collects the notes from the directory to display on the home screen
 Future<List<Note>> collect() async {
   final stopwatch = Stopwatch()..start();
   final directory = await getApplicationDocumentsDirectory();
@@ -108,7 +74,6 @@ Future<List<Note>> collect() async {
       .where(
         (file) =>
             (file.path.endsWith('.txt') ||
-                file.path.endsWith('.json') ||
                 file.path.endsWith('.note')) &&
             !file.uri.pathSegments.last.startsWith('.'),
       )

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'Note.dart';
 
+/// loads the favorites from the app directory
 Future<List<Note>> load_favorites(List<Note> notes) async {
   try {
     final dir = await getApplicationDocumentsDirectory();
@@ -31,6 +32,7 @@ Future<List<Note>> load_favorites(List<Note> notes) async {
   }
 }
 
+/// saves the favorites to the app directory
 Future<void> save_favorites(List<Note> notes) async {
   try {
     final dir = await getApplicationDocumentsDirectory();

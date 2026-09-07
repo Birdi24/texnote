@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.bird.texnote"
+    namespace = "com.bird.birdwrite"
 
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -18,7 +18,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.bird.texnote"
+        applicationId = "com.bird.birdwrite"
 
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion

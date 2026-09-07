@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:texnote/widgets/glass_container.dart';
+import 'package:birdwrite/widgets/glass_container.dart';
 import '../../app_style.dart';
 
 Widget note_body(BuildContext context, QuillController bodyController, double font_size) {
@@ -12,7 +12,7 @@ Widget note_body(BuildContext context, QuillController bodyController, double fo
 Widget rich_text_view(BuildContext context, QuillController bodyController, double font_size) {
   return Container(
     decoration: BoxDecoration(
-      border: Border.all(color: accent), borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: accent), borderRadius: BorderRadius.circular(10),
       color: BG
     ),
     child: Padding(
@@ -20,7 +20,7 @@ Widget rich_text_view(BuildContext context, QuillController bodyController, doub
       child: QuillEditor.basic(
         controller: bodyController,
         config: QuillEditorConfig(
-          autoFocus: false,
+          autoFocus: true,
           expands: true,
           padding: EdgeInsets.zero,
           placeholder: 'Start your note here...',

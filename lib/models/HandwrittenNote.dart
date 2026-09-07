@@ -10,213 +10,11 @@ import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-
+import './stroke.dart';
 import '../app_style.dart';
 import 'Note.dart';
-
-
-
-class Stroke {
-  final List<Offset> points;
-  double size;
-  final Color color;
-
-  final bool hasStartCap;
-  final bool hasEndCap;
-
-  Path? _cachedPath;
-
-  Stroke({
-    required this.points,
-    required this.size,
-    required this.color,
-    this.hasStartCap = true,
-    this.hasEndCap = true,
-  });
-
-  Stroke translate(Offset delta) {
-    return Stroke(
-      points: points.map((p) => p + delta).toList(),
-      size: size,
-      color: color,
-      hasStartCap: hasStartCap,
-      hasEndCap: hasEndCap,
-    );
-  }
-
-  Stroke scale(double scaleFactor, Offset origin) {
-    return Stroke(
-      points: points.map((p) => origin + (p - origin) * scaleFactor).toList(),
-      size: size * scaleFactor,
-      color: color,
-      hasStartCap: hasStartCap,
-      hasEndCap: hasEndCap,
-    );
-  }
-
-  Rect getBounds() {
-    if (points.isEmpty) return Rect.zero;
-    double minX = points[0].dx;
-    double maxX = points[0].dx;
-    double minY = points[0].dy;
-    double maxY = points[0].dy;
-
-    for (final p in points) {
-      if (p.dx < minX) minX = p.dx;
-      if (p.dx > maxX) maxX = p.dx;
-      if (p.dy < minY) minY = p.dy;
-      if (p.dy > maxY) maxY = p.dy;
-    }
-
-    return Rect.fromLTRB(minX, minY, maxX, maxY).inflate(size / 2);
-  }
-
-  Stroke copy() {
-    return Stroke(
-      points: List.from(points),
-      size: size,
-      color: color,
-      hasStartCap: hasStartCap,
-      hasEndCap: hasEndCap,
-    );
-  }
-
-  void invalidateCache() => _cachedPath = null;
-
-  Map<String, dynamic> toMap() {
-    return {
-      'points': points.map((p) => {'dx': p.dx, 'dy': p.dy}).toList(),
-      'size': size,
-      'color': color.value,
-      'hasStartCap': hasStartCap,
-      'hasEndCap': hasEndCap,
-    };
-  }
-
-  factory Stroke.fromMap(Map<String, dynamic> map) {
-    return Stroke(
-      points: (map['points'] as List)
-          .map((p) => Offset((p['dx'] as num).toDouble(), (p['dy'] as num).toDouble()))
-          .toList(),
-      size: (map['size'] as num).toDouble(),
-      color: Color(map['color'] as int),
-      hasStartCap: map['hasStartCap'] ?? true,
-      hasEndCap: map['hasEndCap'] ?? true,
-    );
-  }
-
-  Path buildPath() {
-
-    if (_cachedPath != null) return _cachedPath!;
-
-    final freehandPoints =
-    points.map((p) => PointVector(p.dx, p.dy, 0.5)).toList();
-
-    final outline = getStroke(
-      freehandPoints,
-      options: StrokeOptions(
-        size: size,
-        thinning: 0.5,
-        smoothing: 0.5,
-        streamline: 0.5,
-        simulatePressure: false,
-        start: StrokeEndOptions.start(
-          cap: hasStartCap,
-          taperEnabled: false,
-        ),
-        end: StrokeEndOptions.end(
-          cap: hasEndCap,
-          taperEnabled: false,
-        ),
-      ),
-    );
-
-    final path = Path();
-    if (outline.isNotEmpty) {
-      path.moveTo(outline.first.dx, outline.first.dy);
-      for (final point in outline.skip(1)) {
-        path.lineTo(point.dx, point.dy);
-      }
-      path.close();
-    }
-
-    _cachedPath = path;
-    return path;
-  }
-}
-
-class ImageData {
-  Offset position;
-  String imagePath;
-  double scale;
-  double width;
-  double height;
-
-  ImageData({
-    required this.position,
-    required this.imagePath,
-    this.scale = 1.0,
-    this.width = 200.0,
-    this.height = 200.0,
-  });
-
-  ImageData translate(Offset delta) {
-    return ImageData(
-      position: position + delta,
-      imagePath: imagePath,
-      scale: scale,
-      width: width,
-      height: height,
-    );
-  }
-
-  ImageData scaleFromOrigin(double scaleFactor, Offset origin) {
-    return ImageData(
-      position: origin + (position - origin) * scaleFactor,
-      imagePath: imagePath,
-      scale: scale,
-      width: width * scaleFactor,
-      height: height * scaleFactor,
-    );
-  }
-
-  Rect getBounds() {
-    return Rect.fromLTWH(position.dx, position.dy, width, height);
-  }
-
-  ImageData copy() {
-    return ImageData(
-      position: position,
-      imagePath: imagePath,
-      scale: scale,
-      width: width,
-      height: height,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'position': {'dx': position.dx, 'dy': position.dy},
-      'imagePath': imagePath,
-      'scale': scale,
-      'width': width,
-      'height': height,
-    };
-  }
-
-  factory ImageData.fromMap(Map<String, dynamic> map) {
-    return ImageData(
-      position: Offset(
-        (map['position']['dx'] as num).toDouble(),
-        (map['position']['dy'] as num).toDouble(),
-      ),
-      imagePath: map['imagePath'] as String,
-      scale: (map['scale'] as num?)?.toDouble() ?? 1.0,
-      width: (map['width'] as num?)?.toDouble() ?? 200.0,
-      height: (map['height'] as num?)?.toDouble() ?? 200.0,
-    );
-  }
-}
+import './ImageData.dart';
+import './TextData.dart';
 
 class HandwrittenNote extends Note {
   String cover ="1";
@@ -225,6 +23,7 @@ class HandwrittenNote extends Note {
   List<String?> pageBackgrounds = [];
   String pdfSourcePath;
   List<ImageData> images = [];
+  List<TextData> texts = [];
 
   HandwrittenNote({
     required super.title,
@@ -235,14 +34,14 @@ class HandwrittenNote extends Note {
     super.isFavorite = false,
     List<String?> pageBackgrounds = const [],
     this.pdfSourcePath = "",
-    this.images = const [],
-  }) : pageBackgrounds = List<String?>.from(pageBackgrounds);
+    List<ImageData> images = const [],
+    List<TextData> texts = const [],
+  })  : pageBackgrounds = List<String?>.from(pageBackgrounds),
+        images = List<ImageData>.from(images),
+        texts = List<TextData>.from(texts);
 
 
-  String date_string() {
-    return DateFormat('h:mm a - MMM d, yyyy').format(date);
-  }
-
+  /// json representation of the note
   String get_json() {
     return jsonEncode({
       'strokes': strokes.map((s) => s.toMap()).toList(),
@@ -250,11 +49,14 @@ class HandwrittenNote extends Note {
       'paperType': paperType,
       'pageBackgrounds': pageBackgrounds,
       'images': images.map((i) => i.toMap()).toList(),
+      'texts': texts.map((t) => t.toMap()).toList(),
     });
   }
 
+  /// loads a HandwrittenNote from a file
   static Future<HandwrittenNote> load(String path) async {
     debugPrint("Loading HandwrittenNote from $path");
+
     File file = File(path);
     if (await file.exists()) {
       final content = await file.readAsString();
@@ -272,6 +74,7 @@ class HandwrittenNote extends Note {
     throw Exception("File does not exist at $path");
   }
 
+
   static HandwrittenNote _parseNoteData(Map<String, dynamic> params) {
     final content = params['content'] as String;
     final path = params['path'] as String;
@@ -287,7 +90,8 @@ class HandwrittenNote extends Note {
         type: NoteType.HandwrittenNote,
         paperType: data['paperType'] ?? "blank",
         pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e?.toString()).toList() ?? [],
-        images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? []
+        images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? [],
+        texts: (data['texts'] as List<dynamic>?)?.map((e) => TextData.fromMap(e as Map<String, dynamic>)).toList() ?? []
     );
     if (data['strokes'] != null) {
       note.strokes = (data['strokes'] as List)
@@ -295,7 +99,7 @@ class HandwrittenNote extends Note {
           .toList();
     }
     
-    // Ensure pageBackgrounds is never empty and covers all strokes/images
+    // Ensure pageBackgrounds is never empty and covers all strokes/images/texts
     double maxY = 0;
     for (final stroke in note.strokes) {
       final b = stroke.getBounds();
@@ -303,6 +107,10 @@ class HandwrittenNote extends Note {
     }
     for (final img in note.images) {
       final b = img.getBounds();
+      if (b.bottom > maxY) maxY = b.bottom;
+    }
+    for (final txt in note.texts) {
+      final b = txt.getBounds();
       if (b.bottom > maxY) maxY = b.bottom;
     }
     
@@ -374,7 +182,6 @@ class HandwrittenNote extends Note {
         return;
       }
 
-
       // Determine the directory
       String directoryPath;
       if (await Directory(path).exists()) {
@@ -387,7 +194,7 @@ class HandwrittenNote extends Note {
 
       debugPrint("NewPath: $newPath");
 
-      // Rename an existing Texnote file
+      // Rename an existing BirdWrite file
       if (oldTitle.isNotEmpty && newTitle != oldTitle) {
         debugPrint("Title has changed");
 
@@ -413,6 +220,8 @@ class HandwrittenNote extends Note {
       debugPrint("Error saving note: $e");
     }
   }
+
+
   Future<Note> duplicate_note() async {
     try {
       String newPath;
@@ -432,7 +241,8 @@ class HandwrittenNote extends Note {
           type: type,
           paperType: paperType,
           pageBackgrounds: List.from(pageBackgrounds),
-          images: images.map((i) => i.copy()).toList()
+          images: images.map((i) => i.copy()).toList(),
+          texts: texts.map((t) => t.copy()).toList(),
       );
       dup.strokes = strokes.map((s) => s.copy()).toList();
       dup.cover = cover;
@@ -448,9 +258,7 @@ class HandwrittenNote extends Note {
   Widget display() {
     return Column(
       children: [
-        Container(
-          width: 180,
-          height: 250,
+      AspectRatio(aspectRatio: 0.72, child :Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: collection_color(cover),
@@ -472,12 +280,12 @@ class HandwrittenNote extends Note {
                 ),
               ),
               Positioned(
-                  top: 0, left: 16, width: 2, height: 250,
+                  top: 0, left: 16, bottom: 0, width: 2,
                   child: ColoredBox(color: WHITE.withAlpha(50))
               )
             ],
           )
-        ),
+        )),
 
         const SizedBox(height: 8),
 
@@ -497,6 +305,8 @@ class HandwrittenNote extends Note {
 
         Text(
           date_string(),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
           style: TextStyle(
             color: accent,
             fontSize: 12,
@@ -584,6 +394,32 @@ class HandwrittenNote extends Note {
                       );
                     }),
                     
+                    // User-added Texts
+                    ...texts.where((txt) {
+                      final startY = i * logicalPageHeight;
+                      final endY = (i + 1) * logicalPageHeight;
+                      return txt.position.dy >= startY && txt.position.dy < endY;
+                    }).map((txt) {
+                      final startY = i * logicalPageHeight;
+                      final scaleX = PdfPageFormat.a4.width / logicalPageWidth;
+                      final scaleY = PdfPageFormat.a4.height / logicalPageHeight;
+                      return pw.Positioned(
+                        left: txt.position.dx * scaleX,
+                        top: (txt.position.dy - startY) * scaleY,
+                        child: pw.SizedBox(
+                          width: txt.width * scaleX,
+                          height: txt.height * scaleY,
+                          child: pw.Text(
+                            txt.text,
+                            style: pw.TextStyle(
+                              fontSize: txt.fontSize * scaleY,
+                              color: PdfColor.fromInt(txt.color.value),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    
                     // Paper Type & Strokes
                     pw.Positioned.fill(
                       child: pw.CustomPaint(
@@ -649,8 +485,8 @@ class HandwrittenNote extends Note {
                                   canvas.lineTo(p.dx * scaleX, size.y - (p.dy - startY) * scaleY);
                                 }
                                 canvas.closePath();
-                                final adaptiveColor = getAdaptiveStrokeColor(stroke.color, Colors.white);
-                                canvas.setFillColor(PdfColor.fromInt(adaptiveColor.value));
+                                final adaptiveColor = getAdaptiveStrokeColor(stroke.color, WHITE);
+                                canvas.setFillColor(PdfColor.fromInt(adaptiveColor.toARGB32()));
                                 canvas.fillPath();
                               }
                             }

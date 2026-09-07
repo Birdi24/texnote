@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'package:texnote/models/TextNote.dart';
-import 'package:texnote/models/collections.dart';
-import 'package:texnote/screens/HomeScreen/home_body.dart';
-import 'package:texnote/screens/HomeScreen/home_nav_bar.dart';
-import 'package:texnote/screens/HomeScreen/home_top_bar.dart';
+import 'package:birdwrite/models/TextNote.dart';
+import 'package:birdwrite/models/collections.dart';
+import 'package:birdwrite/screens/HomeScreen/home_body.dart';
+import 'package:birdwrite/screens/HomeScreen/home_nav_bar.dart';
+import 'package:birdwrite/screens/HomeScreen/home_top_bar.dart';
 
 import '../../app_style.dart';
 import '../../io/browse_file.dart';
@@ -12,7 +12,8 @@ import '../../models/Note.dart';
 import '../../models/favorites.dart';
 import '../../widgets/glass_container.dart';
 
-
+/// Stateful because the displayed notes may change depending on the control (collection, all, favorites),
+/// if notes are deleted, created etc...
 class HomeScreen extends StatefulWidget {
   final ThemeManager themeManager;
 
@@ -23,25 +24,35 @@ class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
+
+
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
+
+  /// Holds the list of what is showed per control
   List<Note> notes = [];
   List<Collection> collections = [];
   List<Note> favorites = [];
 
+  /// Holds the currently selected collection, if any
   Collection? _selectedCollection;
 
+  /// Whether the search bar is open or not
   bool _isSearching = false;
+
+  /// Whether the user is in a collection or not, is persistent even when you move between controls
   bool _inCollection = false;
 
-  final TextEditingController _searchController =
-  TextEditingController();
+  /// Controller for the search bar
+  final TextEditingController _searchController = TextEditingController();
 
   String _searchQuery = '';
 
   int sort = 0;
   int control = 1;
+  bool _isAnimating = false;
 
+  /// page controller for the main content
   final PageController _pageController =
   PageController(initialPage: 1);
 
@@ -53,12 +64,10 @@ class _HomeScreenState extends State<HomeScreen>
 
     _searchController.addListener(() {
       setState(() {
-        _searchQuery =
-            _searchController.text.toLowerCase();
+        _searchQuery = _searchController.text.toLowerCase();
       });
     });
-
-    init_files();
+    init_files(); // loads in files from storage
   }
 
   @override
@@ -90,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  /// saves the current state of the app to storage, notes are already saved
   Future<void> saveAppState() async {
     await Future.wait([
       Collection.save_collections(collections),
@@ -97,10 +107,7 @@ class _HomeScreenState extends State<HomeScreen>
     ]);
   }
 
-  // ---------------------------------------------------------------------------
-  // DISPLAYED NOTES
-  // ---------------------------------------------------------------------------
-
+  /// current displayed notes, depending on the control and search query
   List<Note> get displayedNotes => _getDisplayedNotesFor(control);
 
   List<Note> _getDisplayedNotesFor(int targetControl) {
@@ -132,9 +139,6 @@ class _HomeScreenState extends State<HomeScreen>
     }).toList();
   }
 
-  // ---------------------------------------------------------------------------
-  // COLLECTIONS
-  // ---------------------------------------------------------------------------
 
   void openCollection(Collection collection) {
     setState(() {
@@ -152,9 +156,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   get themeManager => widget.themeManager;
 
-  // ---------------------------------------------------------------------------
-  // NOTES
-  // ---------------------------------------------------------------------------
 
   void add_or_remove_favorite(Note note) {
     if (favorites.contains(note)) {
@@ -226,23 +227,26 @@ class _HomeScreenState extends State<HomeScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> onControlChanged(int newControl) async {
+    if (newControl == control) return;
+
     final difference = (newControl - control).abs();
 
     setState(() {
       control = newControl;
+      _isAnimating = true;
     });
-
-
 
     if (_pageController.hasClients) {
       await _pageController.animateToPage(
         newControl,
         duration: Duration(
-          milliseconds: 320 * difference,
+          milliseconds: 300 * difference,
         ),
         curve: Curves.easeInOut,
       );
     }
+
+    _isAnimating = false;
   }
 
   void onSearchChanged() {
@@ -252,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (!_isSearching) {
         _searchController.clear();
       }
-      else {control = 1;}
+      //else {control = 1;}
     });
   }
 
@@ -264,31 +268,20 @@ class _HomeScreenState extends State<HomeScreen>
   void refresh() {
     switch (control) {
       case 0:
-        setState(() {
-          collections =
-              Collection.sort_collections(collections, sort);
-        });
+        setState(() {collections = Collection.sort_collections(collections, sort);});
         break;
 
       case 1:
-        setState(() {
-          notes = Note.sort_notes(notes, sort);
-        });
+        setState(() {notes = Note.sort_notes(notes, sort);});
         break;
 
       case 2:
-        setState(() {
-          favorites =
-              Note.sort_notes(favorites, sort);
-        });
+        setState(() {favorites = Note.sort_notes(favorites, sort);});
         break;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // APP LIFECYCLE
-  // ---------------------------------------------------------------------------
-
+  /// saves the app state when the app is in the background
   @override
   void didChangeAppLifecycleState(
       AppLifecycleState state,
@@ -298,37 +291,26 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // BUILD
-  // ---------------------------------------------------------------------------
-
+  /// The actual widget that is displayed
   @override
   Widget build(BuildContext context) {
-    final screenWidth =
-        MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery.of(context).size.width;
 
     debugPrint("HomeScreen build: ${notes.length} notes, ${displayedNotes.length} displayed");
-    for (var n in notes) {
-      debugPrint("Note in list: ${n.title} (${n.type})");
-    }
+    for (var n in notes) {debugPrint("Note in list: ${n.title} (${n.type})");}
 
     return PopScope(
       canPop: !_inCollection,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _inCollection) {
-          closeCollection();
-        }
-      },
+      onPopInvokedWithResult: (didPop, result) {if (!didPop && _inCollection) {closeCollection();}},
+
       child: Scaffold(
         backgroundColor: BG,
 
         body: SafeArea(
           child: Stack(
             children: [
-              // ----------------------------------------------------------------
-              // MAIN CONTENT
-              // ----------------------------------------------------------------
 
+              /// notes of the current control, positioned below the title
               Positioned(
                 top: 40,
                 left: 0,
@@ -338,9 +320,11 @@ class _HomeScreenState extends State<HomeScreen>
                   controller: _pageController,
 
                   onPageChanged: (index) {
-                    setState(() {
-                      control = index;
-                    });
+                    if (!_isAnimating) {
+                      setState(() {
+                        control = index;
+                      });
+                    }
                   },
 
                   children: [
@@ -404,15 +388,8 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
 
-              // ----------------------------------------------------------------
-              // BACKGROUND
-              // ----------------------------------------------------------------
-
+              /// gradient below the title
               bg_gradient(),
-
-              // ----------------------------------------------------------------
-              // TOP RIGHT
-              // ----------------------------------------------------------------
 
               top_right_button_cluster(
                 control,
@@ -426,10 +403,6 @@ class _HomeScreenState extends State<HomeScreen>
                 themeManager
               ),
 
-              // ----------------------------------------------------------------
-              // TOP LEFT
-              // ----------------------------------------------------------------
-
               top_left_cluster(
                 control,
                 _selectedCollection,
@@ -438,10 +411,7 @@ class _HomeScreenState extends State<HomeScreen>
                 screenWidth,
               ),
 
-              // ----------------------------------------------------------------
-              // SEARCH
-              // ----------------------------------------------------------------
-
+              /// positioned at the bottom, if [_isSearching] is true, the search bar is shown otherwise the nav bar
               _isSearching ?
                 Positioned(
                   bottom: 10,
@@ -450,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: glassContainer(
                     child: Padding(
                       padding: const EdgeInsets.only(
-                        top: 12,
+                        top: 14,
                         left: 10,
                         right: 10,
                       ),
@@ -464,11 +434,14 @@ class _HomeScreenState extends State<HomeScreen>
                           focusedBorder:
                           InputBorder.none,
                           hintText: 'Search notes...',
-                          prefixIcon:
-                          const Icon(LucideIcons.search),
+                          prefixIcon: Transform.translate(
+                            offset: const Offset(0, -4),
+                            child: const Icon(LucideIcons.search),
+                          ),
                           suffixIcon: IconButton(
-                            icon:
-                            const Icon(Icons.clear),
+                            padding: const EdgeInsets.only(bottom: 6),
+                            icon :const Icon(LucideIcons.x),
+                            iconSize: 27,
                             onPressed:
                             onSearchChanged,
                           ),
@@ -488,7 +461,6 @@ class _HomeScreenState extends State<HomeScreen>
                 add_or_remove_favorite,
                 _selectedCollection,
               ),
-              //Positioned(top: 10, left: 100 , child: Text("screen width: ${screenWidth}"))
             ],
           ),
         ),

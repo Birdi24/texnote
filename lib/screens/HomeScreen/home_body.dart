@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 import '../../app_style.dart';
 import '../../models/Note.dart';
 import '../../models/collections.dart';
 import '../../models/TextNote.dart';
 import '../../models/HandwrittenNote.dart';
-import '../HanwrittenNoteScreen/main.dart';
+import '../HandwrittenNoteScreen/main.dart';
 import '../../widgets/show_note_options.dart';
 import '../../widgets/show_collection_options.dart';
 import '../TextNoteScreen/main.dart';
 
-import 'no_collections_view.dart';
-import 'no_notes_view.dart';
+import 'nothing_view.dart';
 
 // =============================================================================
 // NOTE CARD
 // =============================================================================
-
 Widget note_card({
   required BuildContext context,
   required Note note,
@@ -26,6 +25,7 @@ Widget note_card({
   required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
 }) {
+
   void showOptions() {
     final index = 0;
 
@@ -44,7 +44,6 @@ Widget note_card({
   return GestureDetector(
     onLongPress: showOptions,
     onDoubleTap: showOptions,
-
     onTap: () async {
       if (note.type == NoteType.TextNote) {
         await Navigator.push(
@@ -72,7 +71,6 @@ Widget note_card({
 // =============================================================================
 // COLLECTION CARD
 // =============================================================================
-
 Widget collection_card({
   required BuildContext context,
   required Collection collection,
@@ -125,37 +123,44 @@ Widget collection_card({
 // =============================================================================
 // GRID
 // =============================================================================
-
-Widget _grid({
-  required List<Widget> children,
-}) {
+Widget _grid({required List<Widget> children, }) {
   return Padding(
-    padding: const EdgeInsets.symmetric(
-      horizontal: 16,
-    ),
-    child: GridView.builder(
-      physics:
-      const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        // Grid constants
+        const double maxExtent = 220;
+        const double spacing = 12;
+        const double gridPadding = 40; // 20 (left) + 20 (right) inside the grid
 
-      padding: const EdgeInsets.only(
-        top: 50,
-        bottom: 90,
-        left: 20,
-        right: 20,
-      ),
+        // Calculate actual width per item based on SliverGridDelegateWithMaxCrossAxisExtent logic
+        double usableWidth = constraints.maxWidth - gridPadding;
+        int crossAxisCount = ((usableWidth + spacing) / (maxExtent + spacing)).ceil();
+        crossAxisCount = math.max(1, crossAxisCount);
 
-      gridDelegate:
-      const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 260,
-        mainAxisExtent: 300,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
+        double childWidth = (usableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
 
-      itemCount: children.length,
+        double mainAxisExtent = (childWidth / 0.72) + 55;
 
-      itemBuilder: (context, index) {
-        return children[index];
+        return GridView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(
+            top: 50,
+            bottom: 90,
+            left: 20,
+            right: 20,
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisExtent: mainAxisExtent,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: 20,
+          ),
+          itemCount: children.length,
+          itemBuilder: (context, index) {
+            return children[index];
+          },
+        );
       },
     ),
   );
@@ -188,7 +193,7 @@ Widget home_body({
 
   if (control == 0 && !inCollection) {
     if (collections.isEmpty) {
-      return no_collections_view(
+      return nothing_view(
         context,
         onNoteChanged,
         collections,
@@ -218,7 +223,7 @@ Widget home_body({
   }
 
   if (displayedNotes.isEmpty) {
-    return no_note_view(
+    return nothing_view(
       context,
       onNoteChanged,
       collections,

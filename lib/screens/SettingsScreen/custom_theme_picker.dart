@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'package:texnote/widgets/color_picker.dart';
+import 'package:birdwrite/widgets/color_picker.dart';
 
 import '../../app_style.dart';
 
@@ -191,7 +191,7 @@ color: _iconColor,
               ),
               const SizedBox(width: 10),
               Text(
-                'Texnote',
+                'BirdWrite',
                 style: TextStyle(
                   color: _text,
                   fontSize: 18,

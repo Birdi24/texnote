@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:pdfx/pdfx.dart';
 
+/// Only rendering PDF pages near the current page,
 class LazyPdfPageStore {
   LazyPdfPageStore({
     required this.pdfPath,
     required this.noteDir,
-    this.renderRadius = 2, // pages actually rendered around current
-    this.diskKeepRadius = 4, // wider buffer before deleting rendered files
-    this.maxDimension = 2400.0,
+    this.renderRadius = 1, // pages actually rendered around current, aka +-1 from current page
+    this.diskKeepRadius = 4, // wider buffer before deleting rendered pages
+    this.maxDimension = 2400.0, // max dimension of rendered pages
   });
 
   final String pdfPath;
@@ -20,8 +21,12 @@ class LazyPdfPageStore {
 
   PdfDocument? _document;
   final Map<int, String> _renderedPaths = {};
-  final Set<int> _inFlight = {};
 
+  /// Tracks page indices currently being rendered to prevent
+  /// duplicate concurrent rendering tasks for the same page.
+  final Set<int> _currentlyRendering = {};
+
+  /// opens the pdf if it isn't already
   Future<void> _ensureOpen() async {
     _document ??= await PdfDocument.openFile(pdfPath);
   }
@@ -36,9 +41,13 @@ class LazyPdfPageStore {
     return _renderPage(pageIndex);
   }
 
+  /// Renders a singular page from a PDF
   Future<String> _renderPage(int pageIndex) async {
+    // open the file
     await _ensureOpen();
+    // get the page
     final page = await _document!.getPage(pageIndex);
+
     try {
       final scale = (page.width > page.height)
           ? (maxDimension / page.width).clamp(1.0, 2.0)
@@ -50,8 +59,11 @@ class LazyPdfPageStore {
         format: PdfPageImageFormat.jpeg,
       );
 
+      /// Save page locally
       final path = p.join(noteDir.path, 'page_$pageIndex.jpg');
       await File(path).writeAsBytes(pageImage!.bytes);
+
+      /// Cache the path for later
       _renderedPaths[pageIndex] = path;
       return path;
     } finally {
@@ -66,15 +78,21 @@ class LazyPdfPageStore {
     final lo = (currentPage - renderRadius).clamp(1, pagesCount);
     final hi = (currentPage + renderRadius).clamp(1, pagesCount);
 
+    // new pages to be rendered
     final toRender = <Future<void>>[];
+
+    // render new pages
     for (int i = lo; i <= hi; i++) {
-      if (!_renderedPaths.containsKey(i) && !_inFlight.contains(i)) {
-        _inFlight.add(i);
-        toRender.add(pathForPage(i).whenComplete(() => _inFlight.remove(i)));
+      if (!_renderedPaths.containsKey(i) && !_currentlyRendering.contains(i)) {
+        _currentlyRendering.add(i);
+        toRender.add(pathForPage(i).whenComplete(() => _currentlyRendering.remove(i)));
       }
     }
+
+    // wait for all new pages to be rendered
     await Future.wait(toRender);
 
+    // evict pages outside diskKeepRadius
     _evictOutside(currentPage);
   }
 
@@ -89,7 +107,7 @@ class LazyPdfPageStore {
     for (final i in toRemove) {
       final path = _renderedPaths.remove(i);
       if (path != null) {
-        File(path).delete().catchError((_) {}); // best-effort
+        File(path).delete().catchError((_) {});
       }
     }
   }

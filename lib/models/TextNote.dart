@@ -25,12 +25,9 @@ class TextNote extends Note {
     required this.body,
     super.isFavorite = false,
   });
-  
-  
-  String date_string() {
-    return DateFormat('h:mm a - MMM d, yyyy').format(date);
-  }
 
+
+  /// loads a TextNote from a file
   static Future<TextNote> load(String path) async {
     File file = File(path);
     if (await file.exists()) {
@@ -42,7 +39,7 @@ class TextNote extends Note {
     throw Exception("File does not exist at $path");
   }
 
-
+  /// saves a TextNote to a file
   Future<void> save(String oldTitle) async {
     try {
       String newTitle = sanitizeFileName(title.trim());
@@ -95,7 +92,6 @@ class TextNote extends Note {
         return;
       }
 
-
       // Determine the directory
       String directoryPath;
       if (await Directory(path).exists()) {
@@ -108,7 +104,7 @@ class TextNote extends Note {
 
       debugPrint("NewPath: $newPath");
 
-      // Rename an existing Texnote file
+      // Rename an existing BirdWrite file
       if (oldTitle.isNotEmpty && newTitle != oldTitle) {
         debugPrint("Title has changed");
 
@@ -134,6 +130,8 @@ class TextNote extends Note {
       debugPrint("Error saving note: $e");
     }
   }
+
+  /// creates a duplicate of a TextNote
   Future<Note> duplicate_note() async {
     try {
       String newPath;
@@ -155,6 +153,7 @@ class TextNote extends Note {
     }
   }
 
+  /// returns a preview of the note's body
   String getPreviewText() {
     try {
       if (body.startsWith('[') || body.startsWith('{')) {
@@ -171,35 +170,35 @@ class TextNote extends Note {
     return body;
   }
 
+  /// returns a widget representing the note
   Widget display() {
     return Column(
       children: [
-        Container(
-          width: 180,
-          height: 250,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: icon_color,
-              width: 1,
-            ),
-          ),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Text(
-              getPreviewText(),
-              maxLines: 10,
-              overflow: TextOverflow.fade,
-              style: TextStyle(
+        AspectRatio(aspectRatio: 0.72, child :Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: icon_color,
+          width: 1,
+        ),
+      ),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Text(
+          getPreviewText(),
+          maxLines: 10,
+          overflow: TextOverflow.fade,
+          style: TextStyle(
 
-                color: icon_color,
-                fontSize: 13,
-                height: 1.5,
-              ),
-            ),
+            color: icon_color,
+            fontSize: 13,
+            height: 1.5,
           ),
         ),
+      ),
+    ),),
+        
 
         const SizedBox(height: 8),
 
@@ -219,6 +218,8 @@ class TextNote extends Note {
 
         Text(
           date_string(),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
           style: TextStyle(
             color: accent,
             fontSize: 12,
@@ -252,13 +253,54 @@ class TextNote extends Note {
   Future<void> exportAsPdf() async {
     try {
       final pdf = pw.Document();
+
+      List<pw.Widget> content = [];
+      content.add(pw.Header(level: 0, text: title));
+
+      try {
+        if (body.startsWith('[') || body.startsWith('{')) {
+          final decoded = jsonDecode(body);
+          if (decoded is List) {
+            final delta = Delta.fromJson(decoded);
+
+            for (var op in delta.operations) {
+              if (op.isInsert && op.data is String) {
+                final text = op.data as String;
+                final bool isBold = op.attributes != null && op.attributes!['bold'] == true;
+                final bool isItalic = op.attributes != null && op.attributes!['italic'] == true;
+
+                content.add(
+                  pw.Text(
+                    text,
+                    style: pw.TextStyle(
+                      fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                      fontStyle: isItalic ? pw.FontStyle.italic : pw.FontStyle.normal,
+                    ),
+                  ),
+                );
+              }
+            }
+          } else {
+            content.add(pw.Paragraph(text: getPreviewText()));
+          }
+        } else {
+          content.add(pw.Paragraph(text: getPreviewText()));
+        }
+      } catch (e) {
+        debugPrint("Error parsing rich text for PDF: $e");
+        content.add(pw.Paragraph(text: getPreviewText()));
+      }
+
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
-          build: (context) => [
-            pw.Header(level: 0, text: title),
-            pw.Paragraph(text: getPreviewText()),
-          ],
+          build: (pw.Context context) {
+            return [
+              pw.Wrap(
+                children: content,
+              )
+            ];
+          },
         ),
       );
 

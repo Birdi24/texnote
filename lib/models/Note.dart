@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';
 
 abstract class Note {
   String title;
@@ -38,10 +39,14 @@ abstract class Note {
   Future<void> exportAsPdf();
 
   String sanitizeFileName(String name) {
-    return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').startsWith('.') ? name.substring(1) : name;
   }
 
   Future<Note> duplicate_note();
+
+  String date_string() {
+    return DateFormat('h:mm a - MMM d, yyyy').format(date);
+  }
 
   Future<void> save(String oldTitle);
 

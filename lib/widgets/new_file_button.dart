@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:texnote/widgets/on_new_collection.dart';
-import 'package:texnote/widgets/on_new_handwritten_note.dart';
+import 'package:birdwrite/widgets/on_new_collection.dart';
+import 'package:birdwrite/widgets/on_new_handwritten_note.dart';
 
 import '../app_style.dart';
 import '../io/browse_file.dart';
 import '../models/Note.dart';
 import '../models/TextNote.dart';
-import '../screens/HanwrittenNoteScreen/main.dart';
+import '../screens/HandwrittenNoteScreen/main.dart';
 import '../screens/TextNoteScreen/main.dart';
 import 'glass_container.dart';
 
@@ -17,6 +17,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
 
   showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     backgroundColor: BG,
     builder: (modalContext) {
       return Padding(
@@ -88,6 +89,7 @@ void new_file_options(BuildContext context, Future<void> Function() onNoteCreate
                     ),
 
                     const Divider(height: 1),
+                    SizedBox(height: MediaQuery.of(context).padding.bottom )
 
                   ],
                 ),

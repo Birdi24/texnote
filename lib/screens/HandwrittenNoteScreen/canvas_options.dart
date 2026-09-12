@@ -1,7 +1,6 @@
 
 import 'dart:math';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -9,7 +8,7 @@ import '../../app_style.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/single_circle_button.dart';
 
-enum DrawingTool { pen, eraser, eraser2, highlighter, lasso, duplicate, text }
+enum DrawingTool { pen, eraser2, highlighter, lasso, duplicate, text }
 
 Widget history_button_array(
     context,
@@ -18,7 +17,7 @@ Widget history_button_array(
       bool canUndo = true,
       bool canRedo = true,
     }) {
-  final screen_width = MediaQuery.of(context).size.width;
+  final screenWidth = MediaQuery.of(context).size.width;
   return glassContainer(
     width: 110,
     height: 60,
@@ -27,11 +26,11 @@ Widget history_button_array(
       children: [
         IgnorePointer(
           ignoring: !canUndo,
-          child: single_circle_button(LucideIcons.undo_2, 20.0, canUndo ? 90 : 40, "undo", undo, context, screen_width, button_width: 35.0, bgAlpha: 160),
+          child: single_circle_button(LucideIcons.undo_2, 20.0, canUndo ? 90 : 40, "undo", undo, context, screenWidth, button_width: 35.0, bgAlpha: 160),
         ),
         IgnorePointer(
           ignoring: !canRedo,
-          child: single_circle_button(LucideIcons.redo_2, 20.0, canRedo ? 90 : 40, "redo", redo, context, screen_width, button_width: 35.0, bgAlpha: 160),
+          child: single_circle_button(LucideIcons.redo_2, 20.0, canRedo ? 90 : 40, "redo", redo, context, screenWidth, button_width: 35.0, bgAlpha: 160),
         ),
       ],
     ),
@@ -45,27 +44,27 @@ Widget tool_button_array(
       Function()? onAddPage,
       Function()? onImportImage,
     }) {
-  final screen_width = MediaQuery.of(context).size.width;
+  final screenWidth = MediaQuery.of(context).size.width;
   return glassContainer(
     width: 430,
     height: 60,
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        single_circle_button(LucideIcons.pen_tool, 20.0, selectedTool == DrawingTool.pen ? 90 : 40, "pen", () => onToolChanged?.call(DrawingTool.pen), context, screen_width, button_width: 35.0, rotation: -pi / 2, bgAlpha: 160,),
-        single_circle_button(LucideIcons.type, 20.0, selectedTool == DrawingTool.text ? 90 : 40, "text", () => onToolChanged?.call(DrawingTool.text), context, screen_width, button_width: 35.0, bgAlpha: 160),
-        single_circle_button(LucideIcons.eraser, 20.0, (selectedTool == DrawingTool.eraser || selectedTool == DrawingTool.eraser2) ? 90 : 40, "eraser", () => onToolChanged?.call(DrawingTool.eraser2), context, screen_width, button_width: 35.0, bgAlpha: 160),
-        single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screen_width, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.pen_tool, 20.0, selectedTool == DrawingTool.pen ? 90 : 40, "pen", () => onToolChanged?.call(DrawingTool.pen), context, screenWidth, button_width: 35.0, rotation: -pi / 2, bgAlpha: 160,),
+        single_circle_button(LucideIcons.type, 20.0, selectedTool == DrawingTool.text ? 90 : 40, "text", () => onToolChanged?.call(DrawingTool.text), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.eraser, 20.0, selectedTool == DrawingTool.eraser2 ? 90 : 40, "eraser", () => onToolChanged?.call(DrawingTool.eraser2), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screenWidth, button_width: 35.0, bgAlpha: 160),
 
          VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
 
-        single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screen_width, button_width: 35.0, bgAlpha: 160),
-        single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screen_width, button_width: 35.0, bgAlpha: 160),
-        single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screen_width, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screenWidth, button_width: 35.0, bgAlpha: 160),
 
          VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
         
-        single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screen_width, button_width: 35.0, bgAlpha: 160),
+        single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screenWidth, button_width: 35.0, bgAlpha: 160),
       ],
     ),
   );
@@ -82,25 +81,25 @@ Widget consolidated_tool_array(
       Function()? onAddPage,
       Function()? onImportImage,
     }) {
-  final screen_width = MediaQuery.of(context).size.width;
+  final screenWidth = MediaQuery.of(context).size.width;
 
   List<Widget> buttons = [
     IgnorePointer(
       ignoring: !canUndo,
-      child: single_circle_button(LucideIcons.undo_2, 20.0, canUndo ? 90 : 40, "undo", undo, context, screen_width, button_width: 35.0, bgAlpha: 160),
+      child: single_circle_button(LucideIcons.undo_2, 20.0, canUndo ? 90 : 40, "undo", undo, context, screenWidth, button_width: 35.0, bgAlpha: 160),
     ),
     IgnorePointer(
       ignoring: !canRedo,
-      child: single_circle_button(LucideIcons.redo_2, 20.0, canRedo ? 90 : 40, "redo", redo, context, screen_width, button_width: 35.0, bgAlpha: 160),
+      child: single_circle_button(LucideIcons.redo_2, 20.0, canRedo ? 90 : 40, "redo", redo, context, screenWidth, button_width: 35.0, bgAlpha: 160),
     ),
-    single_circle_button(LucideIcons.pen_tool, 20.0, selectedTool == DrawingTool.pen ? 90 : 40, "pen", () => onToolChanged?.call(DrawingTool.pen), context, screen_width, button_width: 35.0, rotation: -pi / 2, bgAlpha: 160,),
-    single_circle_button(LucideIcons.type, 20.0, selectedTool == DrawingTool.text ? 90 : 40, "text", () => onToolChanged?.call(DrawingTool.text), context, screen_width, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.eraser, 20.0, (selectedTool == DrawingTool.eraser || selectedTool == DrawingTool.eraser2) ? 90 : 40, "eraser", () => onToolChanged?.call(DrawingTool.eraser2), context, screen_width, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screen_width, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screen_width, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screen_width, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screen_width, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screen_width, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.pen_tool, 20.0, selectedTool == DrawingTool.pen ? 90 : 40, "pen", () => onToolChanged?.call(DrawingTool.pen), context, screenWidth, button_width: 35.0, rotation: -pi / 2, bgAlpha: 160,),
+    single_circle_button(LucideIcons.type, 20.0, selectedTool == DrawingTool.text ? 90 : 40, "text", () => onToolChanged?.call(DrawingTool.text), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.eraser, 20.0, selectedTool == DrawingTool.eraser2 ? 90 : 40, "eraser", () => onToolChanged?.call(DrawingTool.eraser2), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screenWidth, button_width: 35.0, bgAlpha: 160),
   ];
 
   return glassContainer(
@@ -116,8 +115,7 @@ Widget consolidated_tool_array(
         ),
         child:Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            spacing: 10,
-            children: buttons,
+            children: buttons.expand((w) => [w, const SizedBox(width: 10)]).toList()..removeLast(),
         ),
       ),
     ),
@@ -139,10 +137,10 @@ Widget left_button_array(
       Function(Color)? onColorChanged,
       VoidCallback? onOpenColorPicker,
     }) {
-  final screen_width = MediaQuery.of(context).size.width;
+  final screenWidth = MediaQuery.of(context).size.width;
   return (DrawingTool.duplicate != selectedTool ) ? glassContainer(
       width: 55,
-      height: (selectedTool == DrawingTool.eraser || selectedTool == DrawingTool.eraser2 ) ? 218 : 318,
+      height: selectedTool == DrawingTool.eraser2 ? 148 : 318,
       child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -153,7 +151,7 @@ Widget left_button_array(
                 "plus",
                 () => onIncrementSize?.call(),
                 context,
-                screen_width,
+                screenWidth,
                 button_width: 35.0,
                 bgAlpha: 160
             ),
@@ -182,40 +180,16 @@ Widget left_button_array(
                 "minus",
                 () => onDecrementSize?.call(),
                 context,
-                screen_width,
+                screenWidth,
                 button_width: 35.0,
                 bgAlpha: 160),
 
-
-
-            (selectedTool == DrawingTool.eraser || selectedTool == DrawingTool.eraser2)
-                ? eraser_further_options(context,screen_width, selectedTool, onSwitchEraserType)
-                : pen_further_options(context, screen_width, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker)
+            if (selectedTool != DrawingTool.eraser2)
+               pen_further_options(context, screenWidth, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker)
           ]
       )
     ) : SizedBox.shrink();
   }
-
-Widget eraser_further_options(context,screen_width, selectedTool, onSwitchEraserType) {
-
-  return Column(
-    children: [
-       Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
-      const SizedBox(height: 14,),
-      single_circle_button(
-        (selectedTool == DrawingTool.eraser) ? LucideIcons.circle_dashed : LucideIcons.circle,
-        20.0,
-        90,
-        "eraser_type",
-            () => onSwitchEraserType?.call(),
-        context,
-        screen_width,
-        button_width: 35.0,
-        bgAlpha: 160
-      )
-    ]
-  );
-}
 
 Widget color_button(Color color, VoidCallback onTap, {bool hasOutline = false}) {
   return GestureDetector(
@@ -239,7 +213,7 @@ Widget color_button(Color color, VoidCallback onTap, {bool hasOutline = false}) 
   );
 }
 
-Widget pen_further_options(context, screen_width, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker) {
+Widget pen_further_options(context, screenWidth, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker) {
   return Column(
       children: [
          Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
@@ -262,7 +236,7 @@ Widget pen_further_options(context, screen_width, currentPenColor, secondaryPenC
             "color wheel",
             () => onOpenColorPicker?.call(),
             context,
-            screen_width,
+            screenWidth,
             button_width: 35.0,
             bgAlpha: 160
         )

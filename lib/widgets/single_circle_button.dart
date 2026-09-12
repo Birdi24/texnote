@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../app_style.dart';
 import 'glass_container.dart';
@@ -10,13 +9,13 @@ Widget single_circle_button(
     String label,
     Function() function,
     BuildContext context,
-    screen_width, {
+    screenWidth, {
       double? button_width,
       double rotation = 0,
       int bgAlpha = 10,
       Color? iconColor,
     }) {
-  final width = button_width ?? ((screen_width > 600) ? 68.0 : 58.0);
+  final width = button_width ?? ((screenWidth > 600) ? 68.0 : 58.0);
   return glassContainer(
     width: width, height: width, radius: width / 2, bgAlpha: bgAlpha,
     borderAlpha: alpha,

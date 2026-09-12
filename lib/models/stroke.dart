@@ -83,7 +83,7 @@ class Stroke {
     return {
       'points': points.map((p) => {'dx': p.dx, 'dy': p.dy}).toList(),
       'size': size,
-      'color': color.value,
+      'color': color.toARGB32(),
       'hasStartCap': hasStartCap,
       'hasEndCap': hasEndCap,
     };

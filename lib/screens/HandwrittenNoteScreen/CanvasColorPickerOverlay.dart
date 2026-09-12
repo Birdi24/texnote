@@ -18,8 +18,9 @@ class CanvasColorPickerOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return glassContainer(
-      width: 250,
-      height: 424,
+      width: 200,
+      height: 272,
+      radius: 25,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -31,22 +32,13 @@ class CanvasColorPickerOverlay extends StatelessWidget {
                 onColorChanged: (color, identifier) {
                   onColorChanged(color);
                 },
+                width: 168,
               ),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: onDismiss,
-              child: Text(
-                "Done",
-                style: AppStyles.icon_text.copyWith(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            )
+
           ],
         ),
-      ),
+      )
     );
   }
 }

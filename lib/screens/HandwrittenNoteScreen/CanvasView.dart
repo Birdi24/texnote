@@ -1,31 +1,27 @@
 import 'dart:io';
-import 'dart:math' as math;
+import 'dart:ui' as ui;
 
-import '../../models/ImageData.dart';
-import '../../models/TextData.dart';
-import '../../models/stroke.dart';
-
+import 'package:birdwrite/screens/HandwrittenNoteScreen/PageListView.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:birdwrite/screens/HandwrittenNoteScreen/canvas_options.dart';
 
 import '../../app_style.dart';
-import '../../models/HandwrittenNote.dart' show Stroke, ImageData, TextData;
+import '../../models/ImageData.dart';
+import '../../models/TextData.dart';
+import '../../models/stroke.dart';
 import '../../widgets/single_circle_button.dart';
 import 'BottomCanvas.dart';
 import 'TopCanvas.dart';
 import 'CanvasBackground.dart';
 import 'CanvasColorPickerOverlay.dart';
 import 'canvas_history.dart';
+import 'canvas_options.dart';
 import 'canvas_transformation_controller.dart';
 import 'CanvasScrollbar.dart';
-import 'PageListView.dart';
-
-const PageSize = Size(840,1188);
 
 class CanvasView extends StatefulWidget {
   final List<Stroke> bottomLayerStrokes;
@@ -40,6 +36,7 @@ class CanvasView extends StatefulWidget {
   final String paperType;
   final List<String?> pageBackgrounds;
   final PageBackgroundResolver? resolvePageBackground;
+  final ValueChanged<int>? onPageChanged;
 
   const CanvasView({
     super.key,
@@ -55,13 +52,14 @@ class CanvasView extends StatefulWidget {
     required this.paperType,
     this.pageBackgrounds = const [],
     this.resolvePageBackground,
+    this.onPageChanged,
   });
 
   @override
-  State<CanvasView> createState() => _CanvasViewState();
+  State<CanvasView> createState() => CanvasViewState();
 }
 
-class _CanvasViewState extends State<CanvasView> {
+class CanvasViewState extends State<CanvasView> {
   final CanvasTransformationController _transformationController = CanvasTransformationController();
   final CanvasHistoryManager _historyManager = CanvasHistoryManager();
 
@@ -95,6 +93,9 @@ class _CanvasViewState extends State<CanvasView> {
   // Track max Y content coordinate imperatively to eliminate O(N) calculations
   double _maxContentY = 0.0;
 
+  // Cache rasterized page thumbnails to prevent vector re-paints
+  final Map<int, ui.Image> _thumbnailCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -117,9 +118,23 @@ class _CanvasViewState extends State<CanvasView> {
   void dispose() {
     _transformationController.removeListener(_onTransformationChanged);
     _transformationController.dispose();
+    _clearThumbnailCache();
     super.dispose();
   }
 
+  void _clearThumbnailCache() {
+    for (final img in _thumbnailCache.values) {
+      img.dispose(); // Releases native Engine image resources
+    }
+    _thumbnailCache.clear();
+  }
+
+  void refreshPartitions() {
+    // This is called from main.dart to refresh bounds if needed
+    setState(() {
+      _recomputeContentBounds();
+    });
+  }
 
   void _recomputeContentBounds() {
     double maxY = 0.0;
@@ -152,6 +167,74 @@ class _CanvasViewState extends State<CanvasView> {
     }
   }
 
+  Future<void> _updateThumbnailCache(int pageIndex) async {
+    if (_basePageHeight <= 0 || _pageWidth <= 0) return;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final pageRect = Rect.fromLTWH(0, 0, _pageWidth, _basePageHeight);
+
+    // Background
+    final bgPaint = Paint()..color = Colors.white;
+    canvas.drawRect(pageRect, bgPaint);
+
+    final pageStartY = pageIndex * _basePageHeight;
+    final pageEndY = (pageIndex + 1) * _basePageHeight;
+
+    // Render bottom strokes relative to current page bounds
+    for (final stroke in widget.bottomLayerStrokes) {
+      if (stroke.points.isEmpty) continue;
+
+      final bounds = stroke.getBounds();
+      if (bounds.bottom >= pageStartY && bounds.top <= pageEndY) {
+        final paint = Paint()
+          ..color = stroke.color
+          ..strokeWidth = stroke.size
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+
+        final path = Path();
+        final firstPoint = stroke.points.first;
+        path.moveTo(firstPoint.dx, firstPoint.dy - pageStartY);
+
+        for (int i = 1; i < stroke.points.length; i++) {
+          final pt = stroke.points[i];
+          path.lineTo(pt.dx, pt.dy - pageStartY);
+        }
+
+        canvas.drawPath(path, paint);
+      }
+    }
+
+    // Rasterize
+    final picture = recorder.endRecording();
+    const double thumbnailWidth = 150.0;
+    final double scale = thumbnailWidth / _pageWidth;
+    final int thumbnailHeight = (_basePageHeight * scale).toInt();
+
+    final imageRecorder = ui.PictureRecorder();
+    final imageCanvas = Canvas(imageRecorder);
+    imageCanvas.scale(scale, scale);
+    imageCanvas.drawPicture(picture);
+
+    final scaledPicture = imageRecorder.endRecording();
+    final newImage = await scaledPicture.toImage(
+      thumbnailWidth.toInt(),
+      thumbnailHeight,
+    );
+
+    if (mounted) {
+      setState(() {
+        // Swap out old image and dispose it only AFTER new image is ready
+        final oldImage = _thumbnailCache[pageIndex];
+        _thumbnailCache[pageIndex] = newImage;
+        oldImage?.dispose();
+      });
+    } else {
+      newImage.dispose();
+    }
+  }
 
   void _onTransformationChanged() {
     final page = _computeCurrentPage();
@@ -159,6 +242,7 @@ class _CanvasViewState extends State<CanvasView> {
       setState(() {
         _currentPageIndex = page;
       });
+      widget.onPageChanged?.call(page);
     }
   }
 
@@ -187,6 +271,7 @@ class _CanvasViewState extends State<CanvasView> {
       texts: widget.texts,
       topTexts: topTexts,
     );
+    _updateThumbnailCache(_currentPageIndex);
     setState(() {});
     widget.onChanged();
   }
@@ -207,6 +292,12 @@ class _CanvasViewState extends State<CanvasView> {
 
     _recomputeContentBounds();
 
+    // Clear stale thumbnails and queue fresh renders
+    _clearThumbnailCache();
+    for (int i = 0; i < _numPages; i++) {
+      _updateThumbnailCache(i);
+    }
+
     widget.bottomCanvasKey.currentState?.update();
     widget.topCanvasKey.currentState?.setStrokes(state.topLayer.map((s) => s.copy()).toList());
     widget.topCanvasKey.currentState?.setImages((state.topImages).map((i) => i.copy()).toList());
@@ -215,10 +306,8 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _initializeFit(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    _basePageHeight = PageSize.height;
-    _pageWidth = PageSize.width;
-    _transformationController.minZoom = math.min(mediaQuery.size.width/PageSize.width,mediaQuery.size.height/PageSize.height )/2;
-
+    _basePageHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+    _pageWidth = _basePageHeight * .707;
 
     // Optimized O(1) page bounds calculation using imperatively tracked _maxContentY
     if (_basePageHeight > 0) {
@@ -237,7 +326,6 @@ class _CanvasViewState extends State<CanvasView> {
       pageWidth: _pageWidth,
       viewportWidth: mediaQuery.size.width,
     );
-    _transformationController.zoom = _transformationController.minZoom * 2;
   }
 
   void _handleStylusPointer(PointerEvent event) {
@@ -267,8 +355,8 @@ class _CanvasViewState extends State<CanvasView> {
     if (_selectedTool == DrawingTool.lasso) {
       _onToolChanged(_lastPenEraserTool);
     } else if (_selectedTool == DrawingTool.pen) {
-      _onToolChanged(DrawingTool.eraser);
-    } else if (_selectedTool == DrawingTool.eraser || _selectedTool == DrawingTool.eraser2) {
+      _onToolChanged(DrawingTool.eraser2);
+    } else if (_selectedTool == DrawingTool.eraser2) {
       _onToolChanged(DrawingTool.pen);
     }
   }
@@ -290,11 +378,11 @@ class _CanvasViewState extends State<CanvasView> {
     if (_activePointers.isEmpty) {
       _drawingSuspended = false;
     }
-
     _activePointers.add(event.pointer);
 
     // If first touch is outside page area, suspend drawing to allow one-finger panning
     if (_activePointers.length == 1 && _lastScreenSize != null) {
+      final zoom = _transformationController.zoom;
       final scale = _transformationController.scale;
       final offset = _transformationController.offset;
 
@@ -381,8 +469,10 @@ class _CanvasViewState extends State<CanvasView> {
         imagePath: newPath,
       );
 
-      widget.topCanvasKey.currentState?.addImage(newImageData);
-      _updateContentBoundsWithImage(newImageData);
+      setState(() {
+        widget.images.add(newImageData);
+        _updateContentBoundsWithImage(newImageData);
+      });
       widget.onChanged();
       _recordHistory();
     }
@@ -394,14 +484,10 @@ class _CanvasViewState extends State<CanvasView> {
       return;
     }
 
-    if (tool == DrawingTool.text) {
-      _createTextAtCenter();
-    }
-
     setState(() {
       _selectedTool = tool;
 
-      if (tool == DrawingTool.pen || tool == DrawingTool.eraser || tool == DrawingTool.eraser2) {
+      if (tool == DrawingTool.pen || tool == DrawingTool.eraser2) {
         _lastPenEraserTool = tool;
       }
 
@@ -415,20 +501,9 @@ class _CanvasViewState extends State<CanvasView> {
     });
   }
 
-  void _createTextAtCenter() {
-    final zoom = _transformationController.zoom;
-    final offset = _transformationController.offset;
-    final viewportSize = _lastScreenSize ?? Size.zero;
-
-    final centerX = (-offset.dx + viewportSize.width / 2) / zoom;
-    final centerY = (-offset.dy + viewportSize.height / 2) / zoom;
-
-    widget.topCanvasKey.currentState?.addTextAt(Offset(centerX - 100, centerY - 50));
-  }
-
   void _addPage(Size viewportSize, {int? atIndex}) {
+    final insertIndex = atIndex != null ? atIndex + 1 : _currentPageIndex + 1;
     setState(() {
-      final insertIndex = atIndex != null ? atIndex + 1 : _currentPageIndex + 1;
       _numPages++;
 
       widget.pageBackgrounds.insert(
@@ -452,7 +527,7 @@ class _CanvasViewState extends State<CanvasView> {
           widget.images[i] = img.translate(shiftDelta);
         }
       }
-
+      
       for (int i = 0; i < widget.texts.length; i++) {
         final txt = widget.texts[i];
         if (txt.position.dy >= thresholdY - 1.0) {
@@ -464,6 +539,18 @@ class _CanvasViewState extends State<CanvasView> {
       widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
       _pageHeight = _basePageHeight * _numPages;
 
+      // Shift cached thumbnails down by 1 for all shifted pages
+      final Map<int, ui.Image> updatedCache = {};
+      _thumbnailCache.forEach((pageIdx, image) {
+        if (pageIdx >= insertIndex) {
+          updatedCache[pageIdx + 1] = image;
+        } else {
+          updatedCache[pageIdx] = image;
+        }
+      });
+      _thumbnailCache.clear();
+      _thumbnailCache.addAll(updatedCache);
+
       if (atIndex == null) {
         _transformationController.setOffset(
           Offset(_transformationController.offset.dx, -thresholdY),
@@ -471,6 +558,83 @@ class _CanvasViewState extends State<CanvasView> {
           _pageWidth,
           _pageHeight,
         );
+      }
+    });
+
+    widget.bottomCanvasKey.currentState?.update();
+    _recordHistory();
+
+    // Rasterize the new blank page
+    _updateThumbnailCache(_currentPageIndex +1);
+  }
+  
+  void _deletePage(Size viewportSize, {int? atIndex}) {
+    if (_numPages <= 1) return;
+
+    setState(() {
+      final deleteIndex = atIndex ?? _currentPageIndex;
+      _numPages--;
+
+      widget.pageBackgrounds.removeAt(deleteIndex);
+
+      final pageStartY = deleteIndex * _basePageHeight;
+      final pageEndY = (deleteIndex + 1) * _basePageHeight;
+      final shiftDelta = Offset(0, -_basePageHeight);
+
+      // Remove content in the deleted page and shift content below it
+      widget.bottomLayerStrokes.removeWhere((stroke) {
+        final centerY = stroke.getBounds().center.dy;
+        return centerY >= pageStartY && centerY < pageEndY;
+      });
+      for (int i = 0; i < widget.bottomLayerStrokes.length; i++) {
+        final stroke = widget.bottomLayerStrokes[i];
+        if (stroke.getBounds().top >= pageEndY - 1.0) {
+          widget.bottomLayerStrokes[i] = stroke.translate(shiftDelta);
+        }
+      }
+
+      widget.images.removeWhere((img) {
+        final centerY = img.getBounds().center.dy;
+        return centerY >= pageStartY && centerY < pageEndY;
+      });
+      for (int i = 0; i < widget.images.length; i++) {
+        final img = widget.images[i];
+        if (img.position.dy >= pageEndY - 1.0) {
+          widget.images[i] = img.translate(shiftDelta);
+        }
+      }
+
+      widget.texts.removeWhere((txt) {
+        final centerY = txt.getBounds().center.dy;
+        return centerY >= pageStartY && centerY < pageEndY;
+      });
+      for (int i = 0; i < widget.texts.length; i++) {
+        final txt = widget.texts[i];
+        if (txt.position.dy >= pageEndY - 1.0) {
+          widget.texts[i] = txt.translate(shiftDelta);
+        }
+      }
+
+      widget.topCanvasKey.currentState?.deletePageContent(pageStartY, pageEndY, shiftDelta);
+
+      _recomputeContentBounds();
+      _pageHeight = _basePageHeight * _numPages;
+
+      // Update thumbnail cache
+      _thumbnailCache.remove(deleteIndex);
+      final Map<int, ui.Image> updatedCache = {};
+      _thumbnailCache.forEach((pageIdx, image) {
+        if (pageIdx > deleteIndex) {
+          updatedCache[pageIdx - 1] = image;
+        } else {
+          updatedCache[pageIdx] = image;
+        }
+      });
+      _thumbnailCache.clear();
+      _thumbnailCache.addAll(updatedCache);
+
+      if (_currentPageIndex >= _numPages) {
+        _currentPageIndex = _numPages - 1;
       }
     });
 
@@ -488,7 +652,7 @@ class _CanvasViewState extends State<CanvasView> {
       widget.pageBackgrounds[index] = widget.pageBackgrounds[targetIndex];
       widget.pageBackgrounds[targetIndex] = tempBg;
 
-      // Shift bottomLayerStrokes & images
+      // Shift bottomLayerStrokes, images & texts
       final pageStartY = index * _basePageHeight;
       final pageEndY = (index + 1) * _basePageHeight;
       final targetStartY = targetIndex * _basePageHeight;
@@ -528,29 +692,24 @@ class _CanvasViewState extends State<CanvasView> {
       }
 
       _recomputeContentBounds();
-
+      
       widget.topCanvasKey.currentState?.movePageContent(
         pageStartY, pageEndY, shiftDown,
         targetStartY, targetEndY, shiftUp,
       );
 
-      _currentPageIndex = targetIndex;
-
-      // Scroll to follow the moved page
-      if (_lastScreenSize != null) {
-        final zoom = _transformationController.zoom;
-        final scrollDeltaY = (index - targetIndex) * _basePageHeight * zoom;
-        _transformationController.setOffset(
-          _transformationController.offset + Offset(0, scrollDeltaY),
-          _lastScreenSize!,
-          _pageWidth,
-          _pageHeight,
-        );
-      }
+      // 2. SWAP cached thumbnails
+      final tempImage = _thumbnailCache[index];
+      _thumbnailCache[index] = _thumbnailCache[targetIndex]!;
+      _thumbnailCache[targetIndex] = tempImage!;
 
       widget.bottomCanvasKey.currentState?.update();
       _recordHistory();
     });
+
+    // 3. Re-rasterize swapped pages asynchronously to update translated coordinates
+    _updateThumbnailCache(index);
+    _updateThumbnailCache(targetIndex);
   }
 
   void _scrollToPage(int index) {
@@ -566,7 +725,7 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _switchEraserType() {
     setState(() {
-      _selectedTool = (_selectedTool == DrawingTool.eraser) ? DrawingTool.eraser2 : DrawingTool.eraser;
+      _selectedTool = DrawingTool.eraser2;
       widget.topCanvasKey.currentState?.setTool(_selectedTool);
     });
   }
@@ -587,7 +746,7 @@ class _CanvasViewState extends State<CanvasView> {
         if (hit) changed = true;
         return hit;
       });
-
+      
       widget.texts.removeWhere((txt) {
         bool hit = txt.getBounds().contains(position);
         if (hit) changed = true;
@@ -631,21 +790,12 @@ class _CanvasViewState extends State<CanvasView> {
   List<ImageData> _selectImagesFromBottom(Path lassoPath) {
     final List<ImageData> selected = [];
     final List<ImageData> remaining = [];
-    final Rect lassoBounds = lassoPath.getBounds();
-    final bool isTap = lassoBounds.width < 15 && lassoBounds.height < 15;
 
     for (final img in widget.images) {
       final bounds = img.getBounds();
-      bool hit = false;
-      if (isTap) {
-        hit = bounds.contains(lassoBounds.center);
-      } else {
-        hit = lassoPath.contains(bounds.center) ||
-            lassoPath.contains(bounds.topLeft) ||
-            lassoPath.contains(bounds.bottomRight);
-      }
-
-      if (hit) {
+      if (lassoPath.contains(bounds.center) ||
+          lassoPath.contains(bounds.topLeft) ||
+          lassoPath.contains(bounds.bottomRight)) {
         selected.add(img);
       } else {
         remaining.add(img);
@@ -658,29 +808,21 @@ class _CanvasViewState extends State<CanvasView> {
         widget.images.addAll(remaining);
         _recomputeContentBounds();
       });
+      widget.bottomCanvasKey.currentState?.update();
       widget.onCommit([], [], []);
     }
     return selected;
   }
-
+  
   List<TextData> _selectTextsFromBottom(Path lassoPath) {
     final List<TextData> selected = [];
     final List<TextData> remaining = [];
-    final Rect lassoBounds = lassoPath.getBounds();
-    final bool isTap = lassoBounds.width < 15 && lassoBounds.height < 15;
 
     for (final txt in widget.texts) {
       final bounds = txt.getBounds();
-      bool hit = false;
-      if (isTap) {
-        hit = bounds.contains(lassoBounds.center);
-      } else {
-        hit = lassoPath.contains(bounds.center) ||
-            lassoPath.contains(bounds.topLeft) ||
-            lassoPath.contains(bounds.bottomRight);
-      }
-
-      if (hit) {
+      if (lassoPath.contains(bounds.center) ||
+          lassoPath.contains(bounds.topLeft) ||
+          lassoPath.contains(bounds.bottomRight)) {
         selected.add(txt);
       } else {
         remaining.add(txt);
@@ -693,6 +835,7 @@ class _CanvasViewState extends State<CanvasView> {
         widget.texts.addAll(remaining);
         _recomputeContentBounds();
       });
+      widget.bottomCanvasKey.currentState?.update();
       widget.onCommit([], [], []);
     }
     return selected;
@@ -835,10 +978,6 @@ class _CanvasViewState extends State<CanvasView> {
                                     fit: BoxFit.contain,
                                   ),
                                 )),
-                                BottomCanvas(
-                                  key: widget.bottomCanvasKey,
-                                  strokes: widget.bottomLayerStrokes,
-                                ),
                                 ...widget.texts.map((txt) => Positioned(
                                   left: txt.position.dx,
                                   top: txt.position.dy,
@@ -852,11 +991,15 @@ class _CanvasViewState extends State<CanvasView> {
                                     ),
                                   ),
                                 )),
+                                BottomCanvas(
+                                  key: widget.bottomCanvasKey,
+                                  strokes: widget.bottomLayerStrokes,
+                                ),
                                 DecoratedBox(
                                   decoration: BoxDecoration(
                                     border: Border.all(
-                                      color: icon_color.withAlpha(200),
-                                      width: 2.0,
+                                      color: icon_color.withAlpha(20),
+                                      width: 0.5,
                                     ),
                                   ),
                                   child: TopCanvas(
@@ -873,7 +1016,7 @@ class _CanvasViewState extends State<CanvasView> {
                                         if (b.bottom > _maxContentY) _maxContentY = b.bottom;
                                       }
                                       widget.onCommit(strokes, images, texts);
-                                      // _recordHistory() removed - let onChanged handle it to avoid duplicates
+                                      _recordHistory();
                                     },
                                     onChanged: () {
                                       setState(() {});
@@ -902,10 +1045,8 @@ class _CanvasViewState extends State<CanvasView> {
                         90,
                         "back",
                             () async {
-                          if (widget.changed) {
-                            await widget.onSave();
-                          }
-                          Navigator.pop(context, true);
+                          // Just trigger a pop request. PopScope in HandwrittenNotePage will handle saving if needed.
+                          Navigator.of(context).pop();
                         },
                         context,
                         MediaQuery.of(context).size.width,
@@ -919,7 +1060,7 @@ class _CanvasViewState extends State<CanvasView> {
                       top: 10,
                       left: MediaQuery.of(context).size.width / 2 - 125 > 60
                           ? MediaQuery.of(context).size.width / 2 - 125
-                          : 70,
+                          : 60,
                       child: consolidated_tool_array(
                         context,
                         _handleUndo,
@@ -987,19 +1128,27 @@ class _CanvasViewState extends State<CanvasView> {
                     )
                         : const SizedBox.shrink(),
                     if (_showColorPicker)
-                      Positioned(
-                        left: 80,
-                        bottom: 20,
-                        child: CanvasColorPickerOverlay(
-                          initialColor: (_selectedTool == DrawingTool.highlighter)
-                              ? _highlighterPrimaryColor
-                              : _primaryColor,
-                          onColorChanged: _onColorChanged,
-                          onDismiss: () => setState(() => _showColorPicker = false),
-                        ),
+                      Padding(
+                        padding: EdgeInsetsGeometry.only(left: 80),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TapRegion(
+                            onTapOutside: (event) {
+                              setState(() {
+                                _showColorPicker = false;
+                              });
+                            },
+                            child: CanvasColorPickerOverlay(
+                              initialColor: (_selectedTool == DrawingTool.highlighter)
+                                  ? _highlighterPrimaryColor
+                                  : _primaryColor,
+                              onColorChanged: _onColorChanged,
+                              onDismiss: () => setState(() => _showColorPicker = false),
+                            ),
+                          ),
+                        )
                       ),
-                    if (show_all_buttons)
-                      CanvasScrollbar(
+                    CanvasScrollbar(
                       transformationController: _transformationController,
                       numPages: _numPages,
                       pageWidth: _pageWidth,
@@ -1008,17 +1157,18 @@ class _CanvasViewState extends State<CanvasView> {
                       safeHeight: safeHeight,
                       viewportSize: viewportSize,
                       onTogglePageManager: () => setState(() => _showPageManager = !_showPageManager),
-                      ),
-                    if (_showPageManager && show_all_buttons)
+                    ),
+                    if (_showPageManager)
                       Positioned(
                         right: 0,
                         top: 0,
                         bottom: 0,
                         child: PageListView(
-                          numPages: _numPages,
                           currentPage: _currentPageIndex,
+                          numPages: _numPages,
                           onMovePage: _movePage,
                           onAddPageBelow: (index) => _addPage(viewportSize, atIndex: index),
+                          onDeletePage: (index) => _deletePage(viewportSize, atIndex: index),
                           onPageTap: _scrollToPage,
                           onClose: () => setState(() => _showPageManager = false),
                         ),

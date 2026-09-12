@@ -432,38 +432,38 @@ class AppStyles {
 // MARKDOWN STYLE
 // ============================================================
 
-MarkdownStyleSheet markdown_style(double font_size) {
+MarkdownStyleSheet markdown_style(double fontSize) {
 
   return MarkdownStyleSheet(
 
     // Normal text
     p: AppStyles.bodytext.copyWith(
-      fontSize: font_size,
+      fontSize: fontSize,
     ),
 
     // Headings
     h1: AppStyles.bodytext.copyWith(
-      fontSize: font_size * 1.8,
+      fontSize: fontSize * 1.8,
       fontWeight: FontWeight.bold,
     ),
 
     h2: AppStyles.bodytext.copyWith(
-      fontSize: font_size * 1.5,
+      fontSize: fontSize * 1.5,
       fontWeight: FontWeight.bold,
     ),
 
     h3: AppStyles.bodytext.copyWith(
-      fontSize: font_size * 1.3,
+      fontSize: fontSize * 1.3,
       fontWeight: FontWeight.bold,
     ),
 
     h4: AppStyles.bodytext.copyWith(
-      fontSize: font_size * 1.15,
+      fontSize: fontSize * 1.15,
       fontWeight: FontWeight.bold,
     ),
 
     h5: AppStyles.bodytext.copyWith(
-      fontSize: font_size * 1.05,
+      fontSize: fontSize * 1.05,
       fontWeight: FontWeight.bold,
     ),
 
@@ -474,13 +474,13 @@ MarkdownStyleSheet markdown_style(double font_size) {
 
     // Inline code
     code: GoogleFonts.robotoMono(
-      fontSize: font_size,
+      fontSize: fontSize,
       color: text,
     ),
 
     // Fenced code blocks
     codeblockPadding: EdgeInsets.all(
-      font_size * 0.8,
+      fontSize * 0.8,
     ),
 
     codeblockDecoration: BoxDecoration(
@@ -497,12 +497,12 @@ MarkdownStyleSheet markdown_style(double font_size) {
 
     // Lists
     listBullet: AppStyles.bodytext.copyWith(
-      fontSize: font_size,
+      fontSize: fontSize,
     ),
 
     // Links
     a: AppStyles.bodytext.copyWith(
-      fontSize: font_size,
+      fontSize: fontSize,
       color: BG.computeLuminance() > 0.5 ? Colors.blue : Colors.blueAccent,
       decoration: TextDecoration.underline,
     ),

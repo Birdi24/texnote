@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:birdwrite/models/HandwrittenNote.dart';
 import 'package:birdwrite/models/Note.dart';
+import 'package:birdwrite/models/folder.dart';
 import 'package:birdwrite/screens/HandwrittenNoteScreen/main.dart';
 import '../app_style.dart';
 import 'color_picker.dart';
 import 'glass_container.dart';
 
+void run_async( await_f1, f2 ) async {
+  await await_f1("");
+  f2();
+}
 Future<void> on_new_handwritten_note(
   BuildContext context,
   List<Note> notes,
-  Future<void> Function() onNoteCreated,
+  Future<void> Function([Note?]) onNoteCreated,
   int control,
-  dynamic add_or_remove_favorite,
-  dynamic selected_collection,
+  dynamic addOrRemoveFavorite,
+  Folder? selectedFolder,
 ) async {
-  double screen_width = MediaQuery.of(context).size.width;
+  double screenWidth = MediaQuery.of(context).size.width;
   String selectedColor = "1";
   String selectedPaperType = "blank";
   final titleController = TextEditingController(
@@ -37,8 +43,8 @@ Future<void> on_new_handwritten_note(
               bgAlpha: 30,
               borderAlpha: 244,
               borderColor: collection_color(selectedColor),
-              height: 600,
-              width: screen_width > 420 ? 370 : screen_width - 50,
+              height: 400,
+              width: screenWidth > 420 ? 370 : screenWidth - 50,
               shadowColor: BG,
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -76,7 +82,7 @@ Future<void> on_new_handwritten_note(
                         showFullPicker: true,
                         onColorChanged: (color, identifier) {
                           setState(() {
-                            selectedColor = identifier ?? "#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
+                            selectedColor = identifier ?? "#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
                           });
                         },
                       ),
@@ -111,21 +117,24 @@ Future<void> on_new_handwritten_note(
                               final title = titleController.text.trim();
                               if (title.isEmpty) return;
                               
-                              final dir = await getApplicationDocumentsDirectory();
+                              final appDir = await getApplicationDocumentsDirectory();
+                              final String targetPath = selectedFolder?.path ?? appDir.path;
+                              
                               if (!context.mounted) return;
-
                               Navigator.pop(context); // Close dialog
 
                               final note = HandwrittenNote(
                                 type: NoteType.HandwrittenNote,
                                 title: title,
-                                path: dir.path,
+                                path: p.canonicalize(targetPath),
                                 date: DateTime.now(),
                                 paperType: selectedPaperType,
                               );
                               note.cover = selectedColor;
                               
-                              notes.add(note);
+                              // Save immediately so it exists on disk before opening
+                              run_async(note.save,  onNoteCreated);
+
                               
                               await Navigator.push<bool>(
                                 context,
@@ -134,14 +143,11 @@ Future<void> on_new_handwritten_note(
 
                               if (!context.mounted) return;
                               if (control == 2) {
-                                add_or_remove_favorite(note);
+                                addOrRemoveFavorite(note);
                               }
-                              if (control == 0 && selected_collection != null) {
-                                selected_collection.add_to_collections(note);
-                              }
-                              await onNoteCreated();
+                              await onNoteCreated(note);
                             },
-                            child:  Text('Create', style: TextStyle(color: icon_color)),
+                            child: Text('Create', style: TextStyle(color: icon_color)),
                           ),
                         ],
                       ),

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../app_style.dart';
 import '../../widgets/glass_container.dart';
@@ -29,91 +30,100 @@ class CanvasScrollbar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (numPages <= 1) return const SizedBox.shrink();
 
-    // Calculate current page based on viewport center
-    final currentScale = transformationController.scale;
-    final totalScaledHeight = pageHeight * currentScale;
-    final viewportCenterY = -transformationController.offset.dy + safeHeight / 2;
-    final currentPage = (viewportCenterY / (basePageHeight * currentScale))
-            .floor()
-            .clamp(0, numPages - 1) +
-        1;
+    return ListenableBuilder(
+      listenable: transformationController,
+      builder: (context, _) {
+        // Calculate current page based on viewport center
+        final currentScale = transformationController.scale;
+        final totalScaledHeight = pageHeight * currentScale;
+        final scaledPageHeight = basePageHeight * currentScale;
+        final viewportTopY = -transformationController.offset.dy;
+        
+        // Use the middle of the viewport, but capped by the page height to avoid jumping pages when zoomed out
+        final viewportCenterY = viewportTopY + math.min(safeHeight, scaledPageHeight) / 2;
+        
+        final currentPage = (viewportCenterY / scaledPageHeight)
+                .floor()
+                .clamp(0, numPages - 1) +
+            1;
 
-    const double handleHeight = 30.0;
-    const double topMargin = 80.0;
-    const double bottomMargin = 30.0;
-    final double trackHeight = safeHeight - topMargin - bottomMargin;
+        const double handleHeight = 30.0;
+        const double topMargin = 80.0;
+        const double bottomMargin = 30.0;
 
-    return Positioned(
-      right: 10,
-      top: topMargin,
-      bottom: bottomMargin,
-      width: 60,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double trackHeight = constraints.maxHeight;
+        return Positioned(
+          right: 10,
+          top: topMargin,
+          bottom: bottomMargin,
+          width: 60,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double trackHeight = constraints.maxHeight;
 
-          double scrollbarHandleY = 0;
-          if (totalScaledHeight > safeHeight) {
-            final scrollableRange = totalScaledHeight - safeHeight;
-            final scrollProgress =
-                (-transformationController.offset.dy) / scrollableRange;
-            scrollbarHandleY = (scrollProgress * (trackHeight - handleHeight))
-                .clamp(0, trackHeight - handleHeight);
-          }
+              double scrollbarHandleY = 0;
+              if (totalScaledHeight > safeHeight) {
+                final scrollableRange = totalScaledHeight - safeHeight;
+                final scrollProgress =
+                    (-transformationController.offset.dy) / scrollableRange;
+                scrollbarHandleY = (scrollProgress * (trackHeight - handleHeight))
+                    .clamp(0, trackHeight - handleHeight);
+              }
 
-          void handleScroll(Offset localPosition) {
-            final totalScaledHeight =
-                pageHeight * transformationController.scale;
-            final scrollableRange = totalScaledHeight - safeHeight;
-            if (scrollableRange <= 0) return;
+              void handleScroll(Offset localPosition) {
+                final totalScaledHeight =
+                    pageHeight * transformationController.scale;
+                final scrollableRange = totalScaledHeight - safeHeight;
+                if (scrollableRange <= 0) return;
 
-            // Map finger position to handle top position within the track
-            final handleTop = (localPosition.dy - handleHeight / 2)
-                .clamp(0.0, trackHeight - handleHeight);
-            final scrollProgress = handleTop / (trackHeight - handleHeight);
-            final targetScroll = scrollProgress * scrollableRange;
+                // Map finger position to handle top position within the track
+                final handleTop = (localPosition.dy - handleHeight / 2)
+                    .clamp(0.0, trackHeight - handleHeight);
+                final scrollProgress = handleTop / (trackHeight - handleHeight);
+                final targetScroll = scrollProgress * scrollableRange;
 
-            transformationController.setOffset(
-              Offset(transformationController.offset.dx, -targetScroll),
-              viewportSize,
-              pageWidth,
-              pageHeight,
-            );
-          }
+                transformationController.setOffset(
+                  Offset(transformationController.offset.dx, -targetScroll),
+                  viewportSize,
+                  pageWidth,
+                  pageHeight,
+                );
+              }
 
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (details) => handleScroll(details.localPosition),
-            onVerticalDragUpdate: (details) =>
-                handleScroll(details.localPosition),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: scrollbarHandleY,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: onTogglePageManager,
-                    child: glassContainer(
-                      width: 50,
-                      height: handleHeight,
-                      radius: 12,
-                      child: Center(
-                        child: Text(
-                          "$currentPage",
-                          style: AppStyles.icon_text.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) => handleScroll(details.localPosition),
+                onVerticalDragUpdate: (details) =>
+                    handleScroll(details.localPosition),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: scrollbarHandleY,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: onTogglePageManager,
+                        child: glassContainer(
+                          width: 50,
+                          height: handleHeight,
+                          radius: 12,
+                          child: Center(
+                            child: Text(
+                              "$currentPage",
+                              style: AppStyles.icon_text.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

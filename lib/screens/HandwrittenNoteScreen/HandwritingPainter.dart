@@ -9,6 +9,8 @@ class HandwritingPainter extends CustomPainter {
   final List<Stroke> selectedStrokes;
   final Rect? selectionRect;
   final Path? lassoPath;
+  final Rect? cullRect;
+  final Offset translation;
   Color backgroundColor= BG;
 
   HandwritingPainter({
@@ -17,16 +19,24 @@ class HandwritingPainter extends CustomPainter {
     this.selectedStrokes = const [],
     this.selectionRect,
     this.lassoPath,
+    this.cullRect,
+    this.translation = Offset.zero,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (translation != Offset.zero) {
+      canvas.translate(translation.dx, translation.dy);
+    }
+    
     for (final stroke in strokes) {
+      if (cullRect != null && !stroke.getBounds().overlaps(cullRect!)) continue;
       _drawStroke(canvas, stroke);
     }
     
     // Draw selected strokes with a slight highlight if needed, or just normal
     for (final stroke in selectedStrokes) {
+      if (cullRect != null && !stroke.getBounds().overlaps(cullRect!)) continue;
       _drawStroke(canvas, stroke, isSelected: true);
     }
 
@@ -37,7 +47,7 @@ class HandwritingPainter extends CustomPainter {
 
     if (lassoPath != null) {
       final paint = Paint()
-        ..color = Colors.blue.withOpacity(0.5)
+        ..color = Colors.blue.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0
         ..strokeCap = StrokeCap.round;
@@ -48,7 +58,7 @@ class HandwritingPainter extends CustomPainter {
 
     if (selectionRect != null) {
       final paint = Paint()
-        ..color = Colors.blue.withOpacity(0.3)
+        ..color = Colors.blue.withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0;
       
@@ -93,7 +103,7 @@ class HandwritingPainter extends CustomPainter {
     final color = getAdaptiveStrokeColor(stroke.color, backgroundColor);
 
     final paint = Paint()
-      ..color = isSelected ? color.withOpacity(0.7) : color
+      ..color = isSelected ? color.withValues(alpha: 0.7) : color
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
@@ -101,7 +111,7 @@ class HandwritingPainter extends CustomPainter {
     
     if (isSelected) {
        final glowPaint = Paint()
-      ..color = Colors.blue.withOpacity(0.2)
+      ..color = Colors.blue.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke.size + 2
       ..isAntiAlias = true;

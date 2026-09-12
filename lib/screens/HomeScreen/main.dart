@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'package:birdwrite/models/TextNote.dart';
-import 'package:birdwrite/models/collections.dart';
-import 'package:birdwrite/screens/HomeScreen/home_body.dart';
-import 'package:birdwrite/screens/HomeScreen/home_nav_bar.dart';
-import 'package:birdwrite/screens/HomeScreen/home_top_bar.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 import '../../app_style.dart';
 import '../../io/browse_file.dart';
 import '../../models/Note.dart';
+import '../../models/HandwrittenNote.dart';
+import '../../models/folder.dart';
 import '../../models/favorites.dart';
 import '../../widgets/glass_container.dart';
+import 'home_body.dart';
+import 'home_nav_bar.dart';
+import 'home_top_bar.dart';
 
-/// Stateful because the displayed notes may change depending on the control (collection, all, favorites),
-/// if notes are deleted, created etc...
 class HomeScreen extends StatefulWidget {
   final ThemeManager themeManager;
 
@@ -29,45 +29,34 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
 
-  /// Holds the list of what is showed per control
-  List<Note> notes = [];
-  List<Collection> collections = [];
+  List<Note> allNotes = [];
+  List<Folder> rootFolders = [];
   List<Note> favorites = [];
 
-  /// Holds the currently selected collection, if any
-  Collection? _selectedCollection;
+  Folder? _currentFolder;
+  String? _appDirPath;
 
-  /// Whether the search bar is open or not
   bool _isSearching = false;
 
-  /// Whether the user is in a collection or not, is persistent even when you move between controls
-  bool _inCollection = false;
-
-  /// Controller for the search bar
   final TextEditingController _searchController = TextEditingController();
-
   String _searchQuery = '';
 
   int sort = 0;
   int control = 1;
   bool _isAnimating = false;
 
-  /// page controller for the main content
-  final PageController _pageController =
-  PageController(initialPage: 1);
+  final PageController _pageController = PageController(initialPage: 1);
 
   @override
   void initState() {
     super.initState();
-
+    init_files();
     WidgetsBinding.instance.addObserver(this);
-
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
       });
     });
-    init_files(); // loads in files from storage
   }
 
   @override
@@ -78,102 +67,134 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // DATA
-  // ---------------------------------------------------------------------------
-
   Future<void> init_files() async {
+    debugPrint("main.dart: init_files() started");
+    final appDir = await getApplicationDocumentsDirectory();
+    _appDirPath = p.canonicalize(appDir.path);
+    debugPrint("main.dart: _appDirPath = $_appDirPath");
+
     final savedNotes = await collect();
-    final savedCollections = await Collection.load_collections(savedNotes);
+    debugPrint("main.dart: init_files() collected ${savedNotes.length} notes");
+    for (var n in savedNotes) {
+      debugPrint("   -> Note: '${n.title}' at '${n.path}'");
+    }
+    
+    final savedFolders = await Folder.load_folders(savedNotes);
+    debugPrint("main.dart: init_files() loaded ${savedFolders.length} root folders");
     final savedFavorites = await load_favorites(savedNotes);
-    notes = savedNotes;
-    collections = savedCollections;
+
+    allNotes = savedNotes;
+    rootFolders = savedFolders;
     favorites = savedFavorites;
-    Note.sort_notes(notes, sort);
+
+    if (_currentFolder != null) {
+      final oldPath = _currentFolder!.path;
+      _currentFolder = _findFolderInTree(rootFolders, oldPath);
+      debugPrint("main.dart: restored _currentFolder to ${_currentFolder?.title} (found: ${_currentFolder != null})");
+    }
+
+    Note.sort_notes(allNotes, sort);
     Note.sort_notes(favorites, sort);
-    Collection.sort_collections(collections, sort);
+    Folder.sort_folders(rootFolders, sort);
 
-    setState(() {
-      notes = notes; favorites =favorites; collections = collections;
-
-    });
+    setState(() {});
+    debugPrint("main.dart: init_files() completed. setState called.");
   }
 
-  /// saves the current state of the app to storage, notes are already saved
   Future<void> saveAppState() async {
     await Future.wait([
-      Collection.save_collections(collections),
-      save_favorites(notes),
+      Folder.save_folder_metadata_recursive(rootFolders),
+      save_favorites(allNotes),
     ]);
   }
 
-  /// current displayed notes, depending on the control and search query
-  List<Note> get displayedNotes => _getDisplayedNotesFor(control);
-
-  List<Note> _getDisplayedNotesFor(int targetControl) {
-    List<Note> result;
-    if (targetControl == 2) {
-      result = favorites;
-    } else if (_inCollection && _selectedCollection != null && targetControl == 0) {
-      result = _selectedCollection!.notes;
-    } else {
-      result = notes;
+  List<Note> get pdfNotes => allNotes.where((n) {
+    if (n is HandwrittenNote) {
+      return n.pdfSourcePath.isNotEmpty;
     }
+    return false;
+  }).toList();
 
-    if (_searchQuery.isEmpty) {
-      return result;
+  
+
+  
+  Folder? _findFolderInTree(List<Folder> folders, String path) {
+    final targetPath = p.canonicalize(path);
+    for (var f in folders) {
+      if (p.canonicalize(f.path) == targetPath) return f;
+      final found = _findFolderInTree(f.subfolders, path);
+      if (found != null) return found;
     }
-
-    return result.where((note) {
-      if (note.type == NoteType.TextNote) {
-        return note.title
-            .toLowerCase()
-            .contains(_searchQuery) ||
-            (note as TextNote).body
-            .toLowerCase()
-            .contains(_searchQuery);
-      }
-      return note.title
-          .toLowerCase()
-          .contains(_searchQuery);
+    return null;
+  }
+  
+  // Refined helper to get items for Tab 1 (Browser)
+  List<dynamic> get browserItems {
+    debugPrint("main.dart: browserItems getter. _currentFolder: ${_currentFolder?.title}, allNotes count: ${allNotes.length}");
+    if (_currentFolder != null) {
+      return [..._currentFolder!.subfolders, ..._currentFolder!.notes];
+    }
+    
+    if (_appDirPath == null) return [];
+    
+    final rootNotes = allNotes.where((n) {
+      final dir = p.canonicalize(p.dirname(n.path));
+      return dir == _appDirPath;
     }).toList();
+    debugPrint("main.dart: browserItems root. rootFolders: ${rootFolders.length}, rootNotes: ${rootNotes.length}");
+    return [...rootFolders, ...rootNotes];
   }
 
-
-  void openCollection(Collection collection) {
+  void openFolder(Folder folder) {
     setState(() {
-      _selectedCollection = collection;
-      _inCollection = true;
+      _currentFolder = folder;
     });
   }
 
-  void closeCollection() {
+  void closeFolder() {
     setState(() {
-      _selectedCollection = null;
-      _inCollection = false;
+      _currentFolder = _currentFolder?.parent;
     });
   }
 
-  get themeManager => widget.themeManager;
+  ThemeManager get themeManager => widget.themeManager;
 
+  void _removeNoteFromHierarchy(Note note) {
+    void removeFromFolder(Folder folder) {
+      // Remove by identity OR by path (to handle renames/identity changes)
+      folder.notes.removeWhere((n) => n == note || (n.path == note.path));
+      for (var sub in folder.subfolders) {
+        removeFromFolder(sub);
+      }
+    }
+    for (var root in rootFolders) {
+      removeFromFolder(root);
+    }
+  }
 
   void add_or_remove_favorite(Note note) {
-    if (favorites.contains(note)) {
-      favorites.remove(note);
-      note.isFavorite = false;
-    } else {
-      favorites.add(note);
-      note.isFavorite = true;
-    }
-
-    setState(() {});
+    debugPrint("add_or_remove_favorite(note: ${note.title})");
+    setState(() {
+      if (favorites.contains(note)) {
+        favorites.remove(note);
+        note.isFavorite = false;
+      } else {
+        favorites.add(note);
+        note.isFavorite = true;
+      }
+    });
+    saveAppState();
   }
 
-  void onCollectionDeleted(Collection collection) {
+  void onFolderDeleted(Folder folder) {
     setState(() {
-      collections.remove(collection);
-      if (_selectedCollection == collection) {
-        closeCollection();
+      if (folder.parent != null) {
+        folder.parent!.subfolders.remove(folder);
+      } else {
+        rootFolders.remove(folder);
+      }
+      if (_currentFolder == folder) {
+        _currentFolder = folder.parent;
       }
     });
     saveAppState();
@@ -182,11 +203,9 @@ class _HomeScreenState extends State<HomeScreen>
   void onNotesDeleted(List<Note> notesToDelete) {
     setState(() {
       for (var note in notesToDelete) {
-        notes.remove(note);
+        allNotes.remove(note);
         favorites.remove(note);
-        for (final collection in collections) {
-          collection.notes.remove(note);
-        }
+        _removeNoteFromHierarchy(note);
       }
     });
     saveAppState();
@@ -194,69 +213,68 @@ class _HomeScreenState extends State<HomeScreen>
 
   void onNoteDeleted(Note note) {
     setState(() {
-      notes.remove(note);
+      allNotes.remove(note);
       favorites.remove(note);
-
-      for (final collection in collections) {
-        collection.notes.remove(note);
-      }
+      _removeNoteFromHierarchy(note);
     });
+    saveAppState();
   }
 
-  void onNoteAdded(Note note) {
+  void onNoteAdded(Note note) async {
+    await onNoteChanged(note);
+  }
+
+  Future<void> onNoteChanged([Note? note]) async {
+    debugPrint("main.dart: onNoteChanged(note: ${note?.title})");
+
+    // Remember where the user currently is before rebuilding
+    // the folder tree.
+    final currentFolderPath = _currentFolder?.path;
+
+    final savedFolders = await Folder.load_folders(allNotes);
+
+    if (!mounted) return;
+
     setState(() {
-      notes.add(note);
-      if (control == 2) {
-        favorites.add(note);
-        note.isFavorite = true;
-      }
-      if (_inCollection && _selectedCollection != null) {
-        _selectedCollection!.notes.add(note);
+      rootFolders = savedFolders;
+
+      // Folder.load_folders() creates new Folder objects.
+      // Reconnect the current folder to the new tree.
+      if (currentFolderPath != null) {
+        _currentFolder = _findFolderInTree(
+          rootFolders,
+          currentFolderPath,
+        );
       }
     });
-    onNoteChanged();
-  }
 
-  Future<void> onNoteChanged() async {
     await saveAppState();
-    refresh();
+
+    debugPrint(
+      "main.dart: onNoteChanged completed. "
+          "Current folder: ${_currentFolder?.title}",
+    );
   }
-
-  // ---------------------------------------------------------------------------
-  // CONTROLS
-  // ---------------------------------------------------------------------------
-
   Future<void> onControlChanged(int newControl) async {
     if (newControl == control) return;
-
-    final difference = (newControl - control).abs();
-
     setState(() {
       control = newControl;
       _isAnimating = true;
     });
-
     if (_pageController.hasClients) {
       await _pageController.animateToPage(
         newControl,
-        duration: Duration(
-          milliseconds: 300 * difference,
-        ),
+        duration: Duration(milliseconds: 300 * (newControl - control).abs()),
         curve: Curves.easeInOut,
       );
     }
-
     _isAnimating = false;
   }
 
   void onSearchChanged() {
     setState(() {
       _isSearching = !_isSearching;
-
-      if (!_isSearching) {
-        _searchController.clear();
-      }
-      //else {control = 1;}
+      if (!_isSearching) _searchController.clear();
     });
   }
 
@@ -266,173 +284,124 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void refresh() {
-    switch (control) {
-      case 0:
-        setState(() {collections = Collection.sort_collections(collections, sort);});
-        break;
-
-      case 1:
-        setState(() {notes = Note.sort_notes(notes, sort);});
-        break;
-
-      case 2:
-        setState(() {favorites = Note.sort_notes(favorites, sort);});
-        break;
-    }
+    init_files();
   }
 
-  /// saves the app state when the app is in the background
   @override
-  void didChangeAppLifecycleState(
-      AppLifecycleState state,
-      ) {
-    if (state == AppLifecycleState.paused) {
-      saveAppState();
-    }
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) saveAppState();
   }
 
-  /// The actual widget that is displayed
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
-    debugPrint("HomeScreen build: ${notes.length} notes, ${displayedNotes.length} displayed");
-    for (var n in notes) {debugPrint("Note in list: ${n.title} (${n.type})");}
-
     return PopScope(
-      canPop: !_inCollection,
-      onPopInvokedWithResult: (didPop, result) {if (!didPop && _inCollection) {closeCollection();}},
-
+      canPop: _currentFolder == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _currentFolder != null) closeFolder();
+      },
       child: Scaffold(
         backgroundColor: BG,
-
         body: SafeArea(
           child: Stack(
             children: [
-
-              /// notes of the current control, positioned below the title
               Positioned(
-                top: 40,
-                left: 0,
-                right: 0,
-                bottom: 0,
+                top: 40, left: 0, right: 0, bottom: 0,
                 child: PageView(
                   controller: _pageController,
-
                   onPageChanged: (index) {
-                    if (!_isAnimating) {
-                      setState(() {
-                        control = index;
-                      });
-                    }
+                    if (!_isAnimating) setState(() => control = index);
                   },
-
                   children: [
+                    // Tab 0: PDFs
                     home_body(
                       control: 0,
                       context: context,
-                      notes: notes,
-                      displayedNotes: _getDisplayedNotesFor(0),
-                      collections: collections,
+                      notes: pdfNotes,
+                      displayedNotes: pdfNotes.where((n) => n.title.toLowerCase().contains(_searchQuery)).toList(),
+                      folders: [],
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
-                      onCollectionDeleted: onCollectionDeleted,
+                      onFolderDeleted: (_) {},
                       onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
-                      addToFavorites:
-                      add_or_remove_favorite,
-                      selectedCollection:
-                      _selectedCollection,
-                      inCollection: _inCollection,
-                      openCollection: openCollection
+                      addToFavorites: add_or_remove_favorite,
+                      selectedFolder: null,
+                      inFolder: false,
+                      openFolder: (_) {},
+                      allFolders: rootFolders,
                     ),
-
-                    home_body(
-                      control: 1,
-                      context: context,
-                      notes: notes,
-                      displayedNotes: _getDisplayedNotesFor(1),
-                      collections: collections,
-                      onNoteChanged: onNoteChanged,
-                      onNoteDeleted: onNoteDeleted,
-                      onCollectionDeleted: onCollectionDeleted,
-                      onNotesDeleted: onNotesDeleted,
-                      onNoteAdded: onNoteAdded,
-                      addToFavorites:
-                      add_or_remove_favorite,
-                      selectedCollection:
-                      _selectedCollection,
-                      inCollection: _inCollection,
-                      openCollection: openCollection
+                    // Tab 1: Browser
+                    Builder(
+                      builder: (context) {
+                        final items = browserItems;
+                        final filteredItems = items.where((item) {
+                          final title = item is Folder ? item.title : (item as Note).title;
+                          return title.toLowerCase().contains(_searchQuery);
+                        }).toList();
+                        
+                        return home_body(
+                          control: 1,
+                          context: context,
+                          notes: allNotes,
+                          displayedNotes: filteredItems.whereType<Note>().toList(),
+                          folders: filteredItems.whereType<Folder>().toList(),
+                          onNoteChanged: onNoteChanged,
+                          onNoteDeleted: onNoteDeleted,
+                          onFolderDeleted: onFolderDeleted,
+                          onNotesDeleted: onNotesDeleted,
+                          onNoteAdded: onNoteAdded,
+                          addToFavorites: add_or_remove_favorite,
+                          selectedFolder: _currentFolder,
+                          inFolder: _currentFolder != null,
+                          openFolder: openFolder,
+                          allFolders: rootFolders,
+                        );
+                      }
                     ),
-
+                    // Tab 2: Favorites
                     home_body(
                       control: 2,
                       context: context,
-                      notes: notes,
-                      displayedNotes: _getDisplayedNotesFor(2),
-                      collections: collections,
+                      notes: favorites,
+                      displayedNotes: favorites.where((n) => n.title.toLowerCase().contains(_searchQuery)).toList(),
+                      folders: [],
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
-                      onCollectionDeleted: onCollectionDeleted,
+                      onFolderDeleted: (_) {},
                       onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
-                      addToFavorites:
-                      add_or_remove_favorite,
-                      selectedCollection:
-                      _selectedCollection,
-                      inCollection: _inCollection,
-                      openCollection: openCollection
+                      addToFavorites: add_or_remove_favorite,
+                      selectedFolder: null,
+                      inFolder: false,
+                      openFolder: (_) {},
+                      allFolders: rootFolders,
                     ),
                   ],
                 ),
               ),
-
-              /// gradient below the title
               bg_gradient(),
-
               top_right_button_cluster(
-                control,
-                _inCollection,
-                onNoteChanged,
-                onSortChanged,
-                context,
-                screenWidth,
-                onSearchChanged,
-                _isSearching,
-                themeManager
+                control, _currentFolder != null, onNoteChanged, onSortChanged, 
+                context, screenWidth, onSearchChanged, _isSearching, themeManager
               ),
-
               top_left_cluster(
-                control,
-                _selectedCollection,
-                closeCollection,
-                context,
-                screenWidth,
+                control, _currentFolder, closeFolder, context, screenWidth,
               ),
-
-              /// positioned at the bottom, if [_isSearching] is true, the search bar is shown otherwise the nav bar
               _isSearching ?
                 Positioned(
-                  bottom: 10,
-                  left: 15,
-                  right: 15,
+                  bottom: 10, left: 15, right: 15,
                   child: glassContainer(
                     child: Padding(
-                      padding: const EdgeInsets.only(
-                        top: 14,
-                        left: 10,
-                        right: 10,
-                      ),
+                      padding: const EdgeInsets.only(top: 14, left: 10, right: 10),
                       child: TextField(
                         controller: _searchController,
                         autofocus: true,
                         decoration: InputDecoration(
                           border: InputBorder.none,
-                          enabledBorder:
-                          InputBorder.none,
-                          focusedBorder:
-                          InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                           hintText: 'Search notes...',
                           prefixIcon: Transform.translate(
                             offset: const Offset(0, -4),
@@ -440,10 +409,9 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                           suffixIcon: IconButton(
                             padding: const EdgeInsets.only(bottom: 6),
-                            icon :const Icon(LucideIcons.x),
+                            icon: const Icon(LucideIcons.x),
                             iconSize: 27,
-                            onPressed:
-                            onSearchChanged,
+                            onPressed: onSearchChanged,
                           ),
                         ),
                       ),
@@ -451,15 +419,8 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 )
               : home_nav_bar(
-                onNoteChanged,
-                context,
-                screenWidth,
-                control,
-                onControlChanged,
-                collections,
-                notes,
-                add_or_remove_favorite,
-                _selectedCollection,
+                onNoteChanged, context, screenWidth, control, onControlChanged, 
+                rootFolders, allNotes, add_or_remove_favorite, _currentFolder,
               ),
             ],
           ),

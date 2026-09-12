@@ -111,7 +111,7 @@ class TopCanvasState extends State<TopCanvas> {
       if (tool == DrawingTool.pen) {
         penColor = icon_color;
         penSize = _penSize;
-      } else if (tool == DrawingTool.eraser || tool == DrawingTool.eraser2) {
+      } else if (tool == DrawingTool.eraser2) {
         penColor = BG;
         penSize = _eraserSize;
       } else if (tool == DrawingTool.highlighter) {
@@ -124,7 +124,6 @@ class TopCanvasState extends State<TopCanvas> {
 
       bool wasLassoTool = oldTool == DrawingTool.lasso;
       bool isDrawingTool = tool == DrawingTool.pen ||
-          tool == DrawingTool.eraser ||
           tool == DrawingTool.eraser2 ||
           tool == DrawingTool.highlighter ||
           tool == DrawingTool.text;
@@ -140,7 +139,7 @@ class TopCanvasState extends State<TopCanvas> {
       if (_selectedTool == DrawingTool.pen) {
         _penSize = (_penSize + delta).clamp(0.1, 50.0);
         penSize = _penSize;
-      } else if (_selectedTool == DrawingTool.eraser || _selectedTool == DrawingTool.eraser2) {
+      } else if (_selectedTool == DrawingTool.eraser2) {
         _eraserSize = (_eraserSize + delta).clamp(0.1, 50.0);
         penSize = _eraserSize;
       } else if (_selectedTool == DrawingTool.highlighter) {
@@ -218,6 +217,29 @@ class TopCanvasState extends State<TopCanvas> {
   void cancelCurrentStroke() {
     setState(() {
       _currentStroke = null;
+      if (_lassoManager.currentMode == LassoMode.lassoing) {
+        _lassoManager.lassoPath = null;
+        _lassoManager.lassoPoints = [];
+      }
+      _lassoManager.currentMode = LassoMode.none;
+    });
+  }
+
+  void handleDoubleTapCleanup() {
+    setState(() {
+      // 1. Cancel the active stroke from the second tap
+      _currentStroke = null;
+      
+      // 2. Remove the "dot" left by the first tap
+      if (_toplayer.isNotEmpty) {
+        final last = _toplayer.last;
+        // If it's a very short stroke (likely the first tap of a double tap)
+        if (last.points.length < 5) {
+          _toplayer.removeLast();
+          topStrokeLen = (topStrokeLen - 1).clamp(0, 9999);
+        }
+      }
+      
       if (_lassoManager.currentMode == LassoMode.lassoing) {
         _lassoManager.lassoPath = null;
         _lassoManager.lassoPoints = [];
@@ -436,6 +458,78 @@ class TopCanvasState extends State<TopCanvas> {
     });
   }
 
+  void deletePageContent(double yMin, double yMax, Offset shiftDelta) {
+    setState(() {
+      _toplayer.removeWhere((stroke) {
+        final centerY = stroke.getBounds().center.dy;
+        return centerY >= yMin && centerY < yMax;
+      });
+      _topLayerImages.removeWhere((img) {
+        final centerY = img.getBounds().center.dy;
+        return centerY >= yMin && centerY < yMax;
+      });
+      _topLayerTexts.removeWhere((txt) {
+        final centerY = txt.getBounds().center.dy;
+        return centerY >= yMin && centerY < yMax;
+      });
+
+      _lassoManager.removeSelectedItems(
+        (stroke) {
+          final centerY = stroke.getBounds().center.dy;
+          return centerY >= yMin && centerY < yMax;
+        },
+        (img) {
+          final centerY = img.getBounds().center.dy;
+          return centerY >= yMin && centerY < yMax;
+        },
+        (txt) {
+          final centerY = txt.getBounds().center.dy;
+          return centerY >= yMin && centerY < yMax;
+        },
+      );
+
+      // Shift remaining
+      for (int i = 0; i < _toplayer.length; i++) {
+        final stroke = _toplayer[i];
+        if (stroke.getBounds().top >= yMax - 1.0) {
+          _toplayer[i] = stroke.translate(shiftDelta);
+        }
+      }
+      for (int i = 0; i < _topLayerImages.length; i++) {
+        final img = _topLayerImages[i];
+        if (img.position.dy >= yMax - 1.0) {
+          _topLayerImages[i] = img.translate(shiftDelta);
+        }
+      }
+      for (int i = 0; i < _topLayerTexts.length; i++) {
+        final txt = _topLayerTexts[i];
+        if (txt.position.dy >= yMax - 1.0) {
+          _topLayerTexts[i] = txt.translate(shiftDelta);
+        }
+      }
+
+      for (int i = 0; i < _lassoManager.selectedStrokes.length; i++) {
+        final stroke = _lassoManager.selectedStrokes[i];
+        if (stroke.getBounds().top >= yMax - 1.0) {
+          _lassoManager.selectedStrokes[i] = stroke.translate(shiftDelta);
+        }
+      }
+      for (int i = 0; i < _lassoManager.selectedImages.length; i++) {
+        final img = _lassoManager.selectedImages[i];
+        if (img.position.dy >= yMax - 1.0) {
+          _lassoManager.selectedImages[i] = img.translate(shiftDelta);
+        }
+      }
+      for (int i = 0; i < _lassoManager.selectedTexts.length; i++) {
+        final txt = _lassoManager.selectedTexts[i];
+        if (txt.position.dy >= yMax - 1.0) {
+          _lassoManager.selectedTexts[i] = txt.translate(shiftDelta);
+        }
+      }
+      _lassoManager.updateSelectionRect();
+    });
+  }
+
   void update() {
     setState(() {});
   }
@@ -460,7 +554,7 @@ class TopCanvasState extends State<TopCanvas> {
           _lastPointerDownTime = now;
           _lastPointerDownPos = event.localPosition;
 
-          final bool isEraser = _selectedTool == DrawingTool.eraser || _selectedTool == DrawingTool.eraser2;
+          final bool isEraser = _selectedTool == DrawingTool.eraser2;
 
           // 1. Check for hits on existing selection handles (Resizing) - Global Priority
           if (_lassoManager.selectionRect != null && !isEraser) {
@@ -561,68 +655,72 @@ class TopCanvasState extends State<TopCanvas> {
 
             if (hitText != null || hitImage != null || hitInsideSelection) {
               // Open for editing if double tap OR single tap on already selected item
-              bool shouldEdit = isDoubleTap || (hitInsideSelection && _selectedTool == DrawingTool.text);
+              bool isInteractionTap = isDoubleTap || hitInsideSelection;
               
-              if (shouldEdit && hitText != null) {
-                // Cancel accidental stroke from first tap
-                if (_selectedTool == DrawingTool.pen || _selectedTool == DrawingTool.highlighter) {
-                  if (_toplayer.isNotEmpty && _toplayer.last.points.length < 5) {
-                    _toplayer.removeLast();
-                    topStrokeLen = (topStrokeLen - 1).clamp(0, 9999);
+              if (isInteractionTap) {
+                if (hitText != null) {
+                  // Cancel accidental stroke from first tap
+                  if (_selectedTool == DrawingTool.pen || _selectedTool == DrawingTool.highlighter) {
+                    if (_toplayer.isNotEmpty && _toplayer.last.points.length < 5) {
+                      _toplayer.removeLast();
+                      topStrokeLen = (topStrokeLen - 1).clamp(0, 9999);
+                    }
                   }
-                }
-                setState(() {
-                  _editingText = hitText;
-                  _textEditingController.text = hitText!.text;
-                  _textEditingController.selection = TextSelection.fromPosition(TextPosition(offset: hitText!.text.length));
-                  _selectedTool = DrawingTool.text;
-                  penColor = icon_color;
-                  penSize = _fontSize;
-                });
-                _textFocusNode.requestFocus();
-                // Ensure keyboard opens
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _textFocusNode.requestFocus();
-                });
-                widget.onToolChanged?.call(DrawingTool.text);
-                return;
-              } else {
-                // Single tap selection logic
-                if (!hitInsideSelection) {
                   setState(() {
+                    _editingText = hitText;
+                    _textEditingController.text = hitText!.text;
+                    _textEditingController.selection = TextSelection.fromPosition(TextPosition(offset: hitText.text.length));
+                    _selectedTool = DrawingTool.text;
+                    penColor = icon_color;
+                    penSize = _fontSize;
+                  });
+                  _textFocusNode.requestFocus();
+                  // Ensure keyboard opens
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _textFocusNode.requestFocus();
+                  });
+                  widget.onToolChanged?.call(DrawingTool.text);
+                  return;
+                } else if (hitImage != null && !hitInsideSelection) {
+                   // Double tap to select image if not already selected
+                   setState(() {
                     _editingText = null;
-                    // Move current selection back to top layer
                     _toplayer.addAll(_lassoManager.selectedStrokes);
                     _topLayerImages.addAll(_lassoManager.selectedImages);
                     _topLayerTexts.addAll(_lassoManager.selectedTexts);
                     _lassoManager.selectedStrokes = [];
-                    _lassoManager.selectedImages = [];
+                    _lassoManager.selectedImages = [hitImage!];
                     _lassoManager.selectedTexts = [];
-                    
-                    if (hitText != null) {
-                      _topLayerTexts.remove(hitText);
-                      _lassoManager.selectedTexts = [hitText!];
-                      _selectedTool = DrawingTool.text;
-                      penColor = icon_color;
-                      penSize = _fontSize;
-                      widget.onToolChanged?.call(DrawingTool.text);
-                    } else if (hitImage != null) {
-                      _topLayerImages.remove(hitImage);
-                      _lassoManager.selectedImages = [hitImage!];
-                      // For images, we can switch to lasso or just stay in current drawing tool
-                      // but 'moving' mode will be active.
-                    }
-                    
+                    _topLayerImages.remove(hitImage);
                     _lassoManager.updateSelectionRect();
                     _lassoManager.currentMode = LassoMode.moving;
                   });
                   widget.onChanged?.call();
                   return;
-                } else {
-                  // Tapped inside existing selection
+                } else if (hitInsideSelection) {
                   _lassoManager.currentMode = LassoMode.moving;
                   return;
                 }
+              } else {
+                // Single tap on UNSELECTED item - only select text via single tap (if that's desired)
+                // or just do nothing for images to force double tap.
+                if (hitText != null) {
+                  setState(() {
+                    _editingText = null;
+                    _toplayer.addAll(_lassoManager.selectedStrokes);
+                    _topLayerImages.addAll(_lassoManager.selectedImages);
+                    _topLayerTexts.addAll(_lassoManager.selectedTexts);
+                    _lassoManager.selectedStrokes = [];
+                    _lassoManager.selectedImages = [];
+                    _topLayerTexts.remove(hitText);
+                    _lassoManager.selectedTexts = [hitText!];
+                    _lassoManager.updateSelectionRect();
+                    _lassoManager.currentMode = LassoMode.moving;
+                  });
+                  widget.onChanged?.call();
+                  return;
+                }
+                // For images, we do nothing on single tap, falling through to potential stroke start
               }
             }
           }
@@ -716,14 +814,11 @@ class TopCanvasState extends State<TopCanvas> {
             ..._topLayerImages.map((img) => Positioned(
               left: img.position.dx,
               top: img.position.dy,
-              child: Opacity(
-                opacity: 0.8,
-                child: Image.file(
-                  File(img.imagePath),
-                  width: img.width,
-                  height: img.height,
-                  fit: BoxFit.contain,
-                ),
+              child: Image.file(
+                File(img.imagePath),
+                width: img.width,
+                height: img.height,
+                fit: BoxFit.contain,
               ),
             )),
             ..._lassoManager.selectedImages.map((img) => Positioned(
@@ -774,7 +869,7 @@ class TopCanvasState extends State<TopCanvas> {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
-          color: isSelected ? Colors.blue : (isEditing ? accent : Colors.blue.withOpacity(0.2)),
+          color: isSelected ? Colors.blue : (isEditing ? accent : Colors.blue.withValues(alpha: 0.2)),
           width: isEditing ? 2 : 1,
         ),
       ),
@@ -816,7 +911,7 @@ class TopCanvasState extends State<TopCanvas> {
               txt.text.isEmpty && isSelected ? "Tap to type..." : txt.text,
               style: TextStyle(
                 fontSize: txt.fontSize,
-                color: txt.text.isEmpty ? txt.color.withOpacity(0.5) : txt.color,
+                color: txt.text.isEmpty ? txt.color.withValues(alpha: 0.5) : txt.color,
               ),
             ),
           ),

@@ -47,7 +47,7 @@ final theme = themeManager.theme;
 }
 
 String _hex(Color color) {
-return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
+return '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
 }
 
   Future<void> _pickColor({

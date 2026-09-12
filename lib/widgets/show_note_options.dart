@@ -1,15 +1,19 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:birdwrite/models/HandwrittenNote.dart';
 
 import '../app_style.dart';
 import '../models/Note.dart';
+import '../models/folder.dart';
 import 'color_picker.dart';
 import 'glass_container.dart';
-import 'on_new_collection.dart';
+import 'on_new_folder.dart';
 
 Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, void Function(Note) onNoteDeleted) {
-  final screen_width = MediaQuery.of(context).size.width;
+  final screenWidth = MediaQuery.of(context).size.width;
   return showDialog<bool>(
       barrierColor: Colors.transparent,
       context: context,
@@ -18,20 +22,17 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
             backgroundColor: Colors.transparent,
             elevation: 0,
             child: glassContainer(
-
               bgAlpha: 20,
               borderAlpha: 244,
               borderColor: RED,
-
               height: 220,
-              width: screen_width > 380 ? 330 : screen_width - 50,
+              width: screenWidth > 380 ? 330 : screenWidth - 50,
               shadowColor: BG,
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-
                       const SizedBox(height: 10),
                       const Text(
                         "Delete note?",
@@ -40,14 +41,11 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
                       Text(
                         textAlign: TextAlign.center,
                           notes[index].title.length > 25 ? 'Are you sure you want to delete\n"${notes[index].title.substring(0,22)}..."?' : 'Are you sure you want to delete\n"${notes[index].title}"?'
                       ),
-
                       const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -56,11 +54,9 @@ Future<bool?> delete_alert(BuildContext context, List<Note> notes, int index, vo
                             onPressed: () => Navigator.pop(context),
                             child:  Text('Cancel', style: TextStyle(color: icon_color),),
                           ),
-
                           const SizedBox(width: 15),
-
                           ElevatedButton(
-                            onPressed: () async{
+                            onPressed: () async {
                               Note noteToDelete = notes[index];
                               Navigator.pop(context);
                               await noteToDelete.delete();
@@ -82,11 +78,11 @@ void show_note_options(
     BuildContext context,
     List<Note> notes,
     int index,
-    collections,
-    Future<void> Function() onNoteChanged,
+    List<Folder> folders,
+    Future<void> Function([Note?]) onNoteChanged,
     void Function(Note) onNoteDeleted,
     void Function(Note) onNoteAdded,
-    void Function(Note) add_to_favorites) {
+    void Function(Note) addToFavorites) {
 
   showModalBottomSheet(
     context: context,
@@ -94,15 +90,15 @@ void show_note_options(
     backgroundColor: Colors.transparent,
     elevation: 0,
     builder: (context) {
-      final screen_width = MediaQuery.of(context).size.width;
+      final screenWidth = MediaQuery.of(context).size.width;
 
       return Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          width: screen_width >470 ? 420 : screen_width -50,
-          decoration:  BoxDecoration(
+          width: screenWidth > 470 ? 420 : screenWidth - 50,
+          decoration: BoxDecoration(
             color: BG,
-            borderRadius: BorderRadius.vertical(
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(20),
             ),
           ),
@@ -111,273 +107,75 @@ void show_note_options(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 10),
-
                 ListTile(
                   leading: const Icon(LucideIcons.pen),
                   title: const Text('Rename note'),
                   onTap: () {
                     Navigator.pop(context);
-                    rename_note(
-                      context,
-                      notes,
-                      index,
-                      onNoteChanged,
-                    );
+                    rename_note(context, notes, index, onNoteChanged);
                   },
                 ),
-
                 if (notes[index].type == NoteType.HandwrittenNote)
                   ListTile(
                     leading: const Icon(LucideIcons.palette),
                     title: const Text('Change cover color'),
                     onTap: () {
                       Navigator.pop(context);
-                      change_handwritten_note_color_dialog(
-                        context,
-                        notes,
-                        index,
-                        onNoteChanged,
-                      );
+                      change_handwritten_note_color_dialog(context, notes, index, onNoteChanged);
                     },
                   ),
-
                 ListTile(
                   leading: Icon(
                     LucideIcons.star,
-                    color: notes[index].isFavorite
-                        ? RED
-                        : icon_color,
+                    color: notes[index].isFavorite ? RED : icon_color,
                   ),
                   title: notes[index].isFavorite
-                      ? const Text(
-                    'Remove from favorites',
-                    style: TextStyle(color: RED),
-                  )
+                      ? const Text('Remove from favorites', style: TextStyle(color: RED))
                       : const Text('Add to favorites'),
                   onTap: () {
                     Navigator.pop(context);
-                    add_to_favorites(notes[index]);
+                    addToFavorites(notes[index]);
                   },
                 ),
-
                 ListTile(
                   leading: const Icon(LucideIcons.copy),
                   title: const Text('Duplicate'),
                   onTap: () async {
                     Navigator.pop(context);
-
                     Note dup = await notes[index].duplicate_note();
-
                     if (dup.title != "INVALID") {
                       onNoteAdded(dup);
                     }
                   },
                 ),
-
                 ListTile(
-                  leading: const Icon(LucideIcons.folder),
-                  title: const Text('Add to collection'),
+                  leading: const Icon(LucideIcons.move),
+                  title: const Text('Move to Folder'),
                   onTap: () {
                     Navigator.pop(context);
-
-                    if (collections.isEmpty) {
-                      on_new_collection(
-                        context,
-                        collections,
-                        onNoteChanged,
-                        false,
-                      );
-                      return;
-                    }
-
-                    final screen_width =
-                        MediaQuery.of(context).size.width;
-
-                    showDialog<bool>(
-                      barrierColor: Colors.transparent,
-                      context: context,
-                      builder: (context) {
-                        String? selectedCollection;
-
-                        return StatefulBuilder(
-                          builder: (context, dialogSetState) {
-                            final canSubmit =
-                                selectedCollection != null;
-
-                            return Dialog(
-                              backgroundColor: Colors.transparent,
-                              elevation: 0,
-                              child: glassContainer(
-                                bgAlpha: 10,
-                                borderAlpha: 244,
-                                borderColor: icon_color,
-                                height: 240,
-                                width: screen_width > 430
-                                    ? 380
-                                    : screen_width - 50,
-                                shadowColor: BG,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const SizedBox(height: 10),
-
-                                      const Text(
-                                        "Add to Collection",
-                                        style: TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-
-                                      const SizedBox(height: 25),
-
-                                      Container(
-                                        width: screen_width > 380
-                                            ? 310
-                                            : screen_width - 70,
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: icon_color,
-                                            width: 1,
-                                          ),
-                                          borderRadius:
-                                          BorderRadius.circular(12),
-                                        ),
-                                        child:
-                                        DropdownButton<String>(
-                                          menuWidth:
-                                          screen_width > 380
-                                              ? 310
-                                              : screen_width - 70,
-                                          menuMaxHeight: 300,
-                                          isExpanded: true,
-                                          underline:
-                                          const SizedBox(),
-                                          borderRadius:
-                                          BorderRadius.circular(12),
-                                          padding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                          ),
-                                          value: selectedCollection,
-                                          hint: const Text(
-                                            "Select a collection",
-                                          ),
-                                          items: collections
-                                              .map<
-                                              DropdownMenuItem<String>>(
-                                                (collection) {
-                                              return DropdownMenuItem<
-                                                  String>(
-                                                value:
-                                                collection.title,
-                                                child: Text(
-                                                  collection.title,
-                                                ),
-                                              );
-                                            },
-                                          ).toList(),
-                                          onChanged: (value) {
-                                            dialogSetState(() {
-                                              selectedCollection =
-                                                  value;
-                                            });
-                                          },
-                                        ),
-                                      ),
-
-                                      const SizedBox(height: 25),
-
-                                      Row(
-                                        mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                        children: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                            },
-                                            child: Text(
-                                              'Cancel',
-                                              style: TextStyle(
-                                                color: icon_color,
-                                              ),
-                                            ),
-                                          ),
-
-                                          const SizedBox(width: 15),
-
-                                          ElevatedButton(
-                                            onPressed: !canSubmit
-                                                ? null
-                                                : () {
-                                              final collection =
-                                              collections
-                                                  .firstWhere(
-                                                    (c) =>
-                                                c.title ==
-                                                    selectedCollection,
-                                              );
-
-                                              if (!collection
-                                                  .notes
-                                                  .contains(
-                                                notes[index],
-                                              )) {
-                                                collection.notes
-                                                    .add(
-                                                  notes[index],
-                                                );
-                                              }
-
-                                              onNoteChanged();
-
-                                              Navigator.pop(
-                                                  context);
-                                            },
-                                            child:
-                                            const Text("Done"),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
+                    show_move_note_dialog(context, notes[index], folders, onNoteChanged);
                   },
                 ),
-
                 ListTile(
-                  leading:
-                  const Icon(LucideIcons.file_up),
+                  leading: const Icon(LucideIcons.file_up),
                   title: const Text('Export note'),
                   onTap: () {
                     Navigator.pop(context);
                     notes[index].export();
                   },
                 ),
-
                 ListTile(
-                  leading:
-                  const Icon(LucideIcons.upload),
+                  leading: const Icon(LucideIcons.upload),
                   title: const Text('Export as PDF'),
                   onTap: () {
                     Navigator.pop(context);
                     notes[index].exportAsPdf();
                   },
                 ),
-
                 const Divider(height: 1),
-
                 ListTile(
                   leading: const Icon(
-                    LucideIcons.trash_2,
+                    LucideIcons.trash,
                     color: RED,
                   ),
                   title: const Text(
@@ -386,16 +184,10 @@ void show_note_options(
                   ),
                   onTap: () async {
                     Navigator.pop(context);
-                    delete_alert(
-                      context,
-                      notes,
-                      index,
-                      onNoteDeleted,
-                    );
+                    delete_alert(context, notes, index, onNoteDeleted);
                   },
                 ),
-
-                SizedBox(height: MediaQuery.of(context).padding.bottom )
+                SizedBox(height: MediaQuery.of(context).padding.bottom)
               ],
             ),
           ),
@@ -405,16 +197,85 @@ void show_note_options(
   );
 }
 
-void rename_note(
-    BuildContext context,
-    List<Note> notes,
-    int index,
-    Function() onNoteCreated
-    ) {
-  final controller = TextEditingController(
-    text: notes[index].title,
+void show_move_note_dialog(BuildContext context, Note note, List<Folder> folders, Future<void> Function([Note?]) onNoteChanged) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  
+  showDialog(
+    context: context,
+    barrierColor: Colors.transparent,
+    builder: (context) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: glassContainer(
+          bgAlpha: 10,
+          borderAlpha: 244,
+          borderColor: icon_color,
+          height: 400,
+          width: screenWidth > 430 ? 380 : screenWidth - 50,
+          shadowColor: BG,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Text("Move to Folder", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      ListTile(
+                        leading: const Icon(LucideIcons.infinity),
+                        title: const Text("Home"),
+                        onTap: () async {
+                          final appDir = await getApplicationDocumentsDirectory();
+                          await note.move_to(appDir.path);
+                          await onNoteChanged(note);
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                      ),
+                      ..._buildFolderList(folders, note, onNoteChanged, context),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text("Cancel", style: TextStyle(color: icon_color)),
+                )
+              ],
+            ),
+          ),
+        ),
+      );
+    },
   );
-  final screen_width = MediaQuery.of(context).size.width;
+}
+
+List<Widget> _buildFolderList(List<Folder> folders, Note note, Future<void> Function([Note?]) onNoteChanged, BuildContext context, {int depth = 0}) {
+  List<Widget> list = [];
+  for (var folder in folders) {
+    list.add(Padding(
+      padding: EdgeInsets.only(left: depth * 16.0),
+      child: ListTile(
+        leading: Icon(LucideIcons.folder, color: collection_color(folder.color)),
+        title: Text(folder.title),
+        onTap: () async {
+          await note.move_to(folder.path);
+          await onNoteChanged(note);
+          if (context.mounted) Navigator.pop(context);
+        },
+      ),
+    ));
+    if (folder.subfolders.isNotEmpty) {
+      list.addAll(_buildFolderList(folder.subfolders, note, onNoteChanged, context, depth: depth + 1));
+    }
+  }
+  return list;
+}
+
+void rename_note(BuildContext context, List<Note> notes, int index, Future<void> Function([Note?]) onNoteCreated) {
+  final controller = TextEditingController(text: notes[index].title);
+  final screenWidth = MediaQuery.of(context).size.width;
 
   showDialog(
     context: context,
@@ -428,7 +289,7 @@ void rename_note(
           borderAlpha: 244,
           borderColor: icon_color,
           height: 240,
-          width: screen_width > 420 ? 370 : screen_width -50,
+          width: screenWidth > 420 ? 370 : screenWidth - 50,
           shadowColor: BG,
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -436,55 +297,31 @@ void rename_note(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 12),
-
-                const Text(
-                  "Rename Note",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
+                const Text("Rename Note", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 25),
-
                 TextField(
                   controller: controller,
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: "Note name",
-                  ),
+                  decoration: const InputDecoration(hintText: "Note name"),
                 ),
-
                 const SizedBox(height: 25),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: Text(
-                        "Cancel",
-                        style: TextStyle(
-                          color: icon_color,
-                        ),
-                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text("Cancel", style: TextStyle(color: icon_color)),
                     ),
-
                     const SizedBox(width: 15),
-
                     ElevatedButton(
                       onPressed: () async {
                         final newTitle = controller.text.trim();
-                        debugPrint(newTitle);
                         if (newTitle.isEmpty) return;
                         final oldTitle = notes[index].title;
                         notes[index].title = newTitle;
-                        notes[index].save(oldTitle);
-                        await onNoteCreated();
-
-                        Navigator.pop(context);
+                        await notes[index].save(oldTitle);
+                        await onNoteCreated(notes[index]);
+                        if (context.mounted) Navigator.pop(context);
                       },
                       child: const Text("Done"),
                     ),
@@ -499,12 +336,8 @@ void rename_note(
   );
 }
 
-void change_handwritten_note_color_dialog(
-    BuildContext context,
-    List<Note> notes,
-    int index,
-    Future<void> Function() onNoteChanged) {
-  final screen_width = MediaQuery.of(context).size.width;
+void change_handwritten_note_color_dialog(BuildContext context, List<Note> notes, int index, Future<void> Function([Note?]) onNoteChanged) {
+  final screenWidth = MediaQuery.of(context).size.width;
   final note = notes[index] as HandwrittenNote;
   String currentSelected = note.cover;
 
@@ -523,7 +356,7 @@ void change_handwritten_note_color_dialog(
                 borderAlpha: 244,
                 borderColor: collection_color(currentSelected),
                 height: 560,
-                width: screen_width > 420 ? 370 : screen_width - 50,
+                width: screenWidth > 420 ? 370 : screenWidth - 50,
                 shadowColor: BG,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 20),
@@ -531,13 +364,7 @@ void change_handwritten_note_color_dialog(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 12),
-                      const Text(
-                        "Cover Color",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      const Text("Cover Color", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 25),
                       ColorPicker(
                         initialColor: currentSelected,
@@ -566,7 +393,7 @@ void change_handwritten_note_color_dialog(
                             onPressed: () async {
                               note.cover = currentSelected;
                               await note.save(note.title);
-                              await onNoteChanged();
+                              await onNoteChanged(note);
                               if (context.mounted) Navigator.pop(context);
                             },
                             child: const Text("Done"),

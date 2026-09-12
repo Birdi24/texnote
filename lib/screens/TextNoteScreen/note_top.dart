@@ -1,6 +1,5 @@
 
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -11,7 +10,7 @@ import '../../app_style.dart';
 import '../../widgets/title_label.dart';
 
 Widget note_top(context, changed, Future<void> Function() save,
-    titleController, QuillController bodyController, double font_size,
+    titleController, QuillController bodyController, double fontSize,
     Function(double) onFontSizeChanged,){
 
   return Column(
@@ -48,7 +47,7 @@ Widget note_top(context, changed, Future<void> Function() save,
                       dot_list_button(context, bodyController),
                       numbered_list_button(context, bodyController),
                       checklist_button(context, bodyController),
-                      font_size_picker(context, bodyController, font_size, onFontSizeChanged),
+                      font_size_picker(context, bodyController, fontSize, onFontSizeChanged),
                     ],
                   ),
                 ),

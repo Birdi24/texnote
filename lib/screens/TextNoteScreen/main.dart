@@ -9,12 +9,11 @@ import '../../models/TextNote.dart';
 import 'note_body.dart';
 import 'note_botton.dart';
 import 'note_top.dart';
-import 'note_body_helper_functions.dart';
 
 /// Stateful because the text changes and the theme changes
 class TextNoteScreen extends StatefulWidget {
   TextNote note;
-  TextNoteScreen(this.note);
+  TextNoteScreen(this.note, {super.key});
   @override
   State<TextNoteScreen> createState() => _TextNoteScreenState();
 }
@@ -22,6 +21,7 @@ class TextNoteScreen extends StatefulWidget {
 class _TextNoteScreenState extends State<TextNoteScreen> {
   // Timer for auto-saving the note
   Timer? _autoSaveTimer;
+  bool _isSaving = false;
 
   // Controller for the title of the note
   var titleController = TextEditingController();
@@ -43,9 +43,17 @@ class _TextNoteScreenState extends State<TextNoteScreen> {
   @override
   void initState() {
     super.initState();
-    titleController = TextEditingController(text: widget.note.title,);
+    titleController = TextEditingController(text: widget.note.title);
+
+    Delta delta;
+    if (widget.note.body.isNotEmpty && widget.note.body != "\n") {
+      delta = Delta.fromJson(jsonDecode(widget.note.body));
+    } else {
+      delta = Delta()..insert("\n");
+    }
+
     bodyController = QuillController(
-      document: Document.fromDelta(Delta.fromJson(jsonDecode(widget.note.body))),
+      document: Document.fromDelta(delta),
       selection: const TextSelection.collapsed(offset: 0),
     );
     titleController.addListener(_markChanged);
@@ -116,10 +124,18 @@ class _TextNoteScreenState extends State<TextNoteScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: true,
+      canPop: !changed || _isSaving,
       onPopInvokedWithResult: (didPop, result) async {
-        if (changed){
+        if (didPop) return;
+
+        if (changed && !_isSaving) {
+          setState(() => _isSaving = true);
+          debugPrint("TextNoteScreen: onPopInvoked - saving before pop");
           await save();
+          if (mounted) {
+            debugPrint("TextNoteScreen: save completed, popping");
+            Navigator.of(context).pop();
+          }
         }
       },
       child: Scaffold(

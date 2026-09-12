@@ -10,19 +10,19 @@ import 'Note.dart';
 Future<List<Note>> load_favorites(List<Note> notes) async {
   try {
     final dir = await getApplicationDocumentsDirectory();
-    final file_path = "${dir.path}/.favorites.json";
-    File fav_file = File(file_path);
+    final filePath = "${dir.path}/.favorites.json";
+    File favFile = File(filePath);
 
-    if (await fav_file.exists()) {
-      final contents = await fav_file.readAsString();
+    if (await favFile.exists()) {
+      final contents = await favFile.readAsString();
       if (contents.trim().isNotEmpty) {
         final List<dynamic> paths = jsonDecode(contents);
 
         return notes.where((note) => paths.contains(note.path)).toList();
       }
     } else {
-      await fav_file.create(recursive: true);
-      await fav_file.writeAsString('[]');
+      await favFile.create(recursive: true);
+      await favFile.writeAsString('[]');
       debugPrint("Favorites file not found, creating new one.");
     }
     return [];

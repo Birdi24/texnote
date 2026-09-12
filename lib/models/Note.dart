@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 
 abstract class Note {
   String title;
@@ -9,7 +10,6 @@ abstract class Note {
   String path;
 
   bool isFavorite;
-  String? collectionId;
 
   NoteType type;
 
@@ -22,6 +22,19 @@ abstract class Note {
     if (await file.exists()) {
       await file.delete();
       debugPrint("$path deleted!");
+    }
+  }
+
+  Future<void> move_to(String targetDirectory) async {
+    final oldFile = File(path);
+    if (await oldFile.exists()) {
+      final fileName = p.basename(path);
+      final newPath = p.join(targetDirectory, fileName);
+      if (newPath == path) return;
+      
+      final newFile = await oldFile.rename(newPath);
+      path = newFile.path;
+      debugPrint("Moved note to $path");
     }
   }
 

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdfx/pdfx.dart' as px;
 import './stroke.dart';
 import '../app_style.dart';
 import 'Note.dart';
@@ -43,11 +43,23 @@ class HandwrittenNote extends Note {
 
   /// json representation of the note
   String get_json() {
+    // Sanitize page backgrounds to remove brittle absolute paths
+    final sanitizedBackgrounds = pageBackgrounds.map((bg) {
+      if (bg == null || bg == "blank" || bg.startsWith("pdf_page:")) {
+        return bg;
+      }
+      // If it's an absolute path, we should have converted it to pdf_page:N 
+      // in _resolvePageBackground already. If not, it's safer to save as null 
+      // and let the sequence-based fallback handle it on next load.
+      return null;
+    }).toList();
+
     return jsonEncode({
       'strokes': strokes.map((s) => s.toMap()).toList(),
       'cover': cover,
       'paperType': paperType,
-      'pageBackgrounds': pageBackgrounds,
+      'pageBackgrounds': sanitizedBackgrounds,
+      'pdfSourcePath': pdfSourcePath,
       'images': images.map((i) => i.toMap()).toList(),
       'texts': texts.map((t) => t.toMap()).toList(),
     });
@@ -55,20 +67,21 @@ class HandwrittenNote extends Note {
 
   /// loads a HandwrittenNote from a file
   static Future<HandwrittenNote> load(String path) async {
-    debugPrint("Loading HandwrittenNote from $path");
+    debugPrint("HandwrittenNote.load(path: $path) started");
 
     File file = File(path);
     if (await file.exists()) {
       final content = await file.readAsString();
       final finalTime = await file.lastModified();
       
-      final note = await compute(_parseNoteData, {
+      // Removed 'compute' to eliminate isolate-related hangs during troubleshooting
+      final note = _parseNoteData({
         'content': content,
         'path': path,
         'finalTime': finalTime,
       });
       
-      debugPrint("HandwrittenNote loaded: ${note.title} with ${note.strokes.length} strokes");
+      debugPrint("HandwrittenNote.load(): Loaded '${note.title}' with ${note.strokes.length} strokes");
       return note;
     }
     throw Exception("File does not exist at $path");
@@ -90,6 +103,7 @@ class HandwrittenNote extends Note {
         type: NoteType.HandwrittenNote,
         paperType: data['paperType'] ?? "blank",
         pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e?.toString()).toList() ?? [],
+        pdfSourcePath: data['pdfSourcePath'] ?? "",
         images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? [],
         texts: (data['texts'] as List<dynamic>?)?.map((e) => TextData.fromMap(e as Map<String, dynamic>)).toList() ?? []
     );
@@ -114,8 +128,8 @@ class HandwrittenNote extends Note {
       if (b.bottom > maxY) maxY = b.bottom;
     }
     
-    // Use 1000.0 as a default logical page height if we don't know the screen size
-    int requiredPages = (maxY / 1000.0).ceil();
+    // Use 1188.0 as a default logical page height to match the UI's _pageSize
+    int requiredPages = (maxY / 1188.0).ceil();
     if (requiredPages > note.pageBackgrounds.length) {
       while (note.pageBackgrounds.length < requiredPages) {
         note.pageBackgrounds.add(null);
@@ -130,7 +144,59 @@ class HandwrittenNote extends Note {
     return note;
   }
 
+  @override
+  Future<void> move_to(String targetDirectory) async {
+    final oldPath = path;
+    final oldPdfPath = pdfSourcePath;
+    
+    await super.move_to(targetDirectory);
+    
+    // If the PDF is a separate file in the same directory, move it too.
+    // Avoid double-moving if path and pdfSourcePath were the same (raw PDF case).
+    if (oldPdfPath.isNotEmpty && oldPdfPath != oldPath) {
+      final oldDir = p.dirname(oldPath);
+      if (p.dirname(oldPdfPath) == oldDir) {
+        final pdfFile = File(oldPdfPath);
+        if (await pdfFile.exists()) {
+          final pdfName = p.basename(oldPdfPath);
+          final newPdfPath = p.join(targetDirectory, pdfName);
+          await pdfFile.rename(newPdfPath);
+          pdfSourcePath = newPdfPath;
+        }
+      }
+    } else if (oldPdfPath == oldPath && path.endsWith('.pdf')) {
+      // Raw PDF was moved by super.move_to, update pdfSourcePath to new path
+      pdfSourcePath = path;
+    }
+  }
+
+  Future<void> _syncPdfBackground(String directoryPath, String newTitle) async {
+    if (pdfSourcePath.isEmpty) return;
+
+    final newPdfPath = p.join(directoryPath, '${newTitle}_bg.pdf');
+
+    // Check if we need to regenerate
+    bool needsUpdate = !File(newPdfPath).existsSync() || pdfSourcePath != newPdfPath;
+    if (!needsUpdate) return;
+
+    debugPrint("Syncing PDF background to $newPdfPath");
+
+    try {
+      final sourceFile = File(pdfSourcePath);
+      if (await sourceFile.exists()) {
+        if (pdfSourcePath != newPdfPath) {
+          await sourceFile.copy(newPdfPath);
+        }
+        pdfSourcePath = newPdfPath;
+      }
+    } catch (e) {
+      debugPrint("Error syncing PDF background: $e");
+    }
+  }
+
+  @override
   Future<void> save(String oldTitle) async {
+    debugPrint("HandwrittenNote.save(oldTitle: '$oldTitle') started for '$title'");
     try {
       String newTitle = sanitizeFileName(title.trim());
 
@@ -194,6 +260,9 @@ class HandwrittenNote extends Note {
 
       debugPrint("NewPath: $newPath");
 
+      // Sync PDF background first so get_json() uses updated paths/markers
+      await _syncPdfBackground(directoryPath, newTitle);
+
       // Rename an existing BirdWrite file
       if (oldTitle.isNotEmpty && newTitle != oldTitle) {
         debugPrint("Title has changed");
@@ -205,6 +274,14 @@ class HandwrittenNote extends Note {
           await oldFile.delete();
           debugPrint("$oldPath deleted!");
         }
+
+        // Also delete old PDF background
+        final oldPdfPath = p.join(directoryPath, '${oldTitle}_bg.pdf');
+        final oldPdfFile = File(oldPdfPath);
+        if (await oldPdfFile.exists()) {
+          await oldPdfFile.delete();
+          debugPrint("$oldPdfPath deleted!");
+        }
       }
 
       final file = File(newPath);
@@ -212,16 +289,17 @@ class HandwrittenNote extends Note {
       await file.writeAsString(get_json());
 
       title = newTitle;
-      path = file.path;
+      path = p.canonicalize(file.path);
       date = DateTime.now();
 
-      debugPrint("Saved: ${file.path}");
+      debugPrint("HandwrittenNote.save(): Saved to ${file.path}. Path updated to $path");
     } catch (e) {
       debugPrint("Error saving note: $e");
     }
   }
 
 
+  @override
   Future<Note> duplicate_note() async {
     try {
       String newPath;
@@ -235,12 +313,13 @@ class HandwrittenNote extends Note {
       final file = File(newPath);
       await file.writeAsString(get_json());
       HandwrittenNote dup = HandwrittenNote(
-          title: title + "-Copy",
+          title: "$title-Copy",
           date: DateTime.now(),
           path: newPath,
           type: type,
           paperType: paperType,
           pageBackgrounds: List.from(pageBackgrounds),
+          pdfSourcePath: pdfSourcePath,
           images: images.map((i) => i.copy()).toList(),
           texts: texts.map((t) => t.copy()).toList(),
       );
@@ -255,6 +334,7 @@ class HandwrittenNote extends Note {
     }
   }
 
+  @override
   Widget display() {
     return Column(
       children: [
@@ -338,11 +418,12 @@ class HandwrittenNote extends Note {
 
   @override
   Future<void> exportAsPdf() async {
+    px.PdfDocument? bgPdf;
     try {
       final pdf = pw.Document();
       
-      const double logicalPageHeight = 1000.0;
-      const double logicalPageWidth = 707.0;
+      const double logicalPageHeight = 1188.0;
+      const double logicalPageWidth = 840.0;
 
       int numPages = pageBackgrounds.length;
       if (numPages == 0) {
@@ -355,7 +436,48 @@ class HandwrittenNote extends Note {
         if (numPages == 0) numPages = 1;
       }
 
+      if (pdfSourcePath.isNotEmpty) {
+        try {
+          bgPdf = await px.PdfDocument.openFile(pdfSourcePath);
+        } catch (e) {
+          debugPrint("Could not open PDF source for export: $e");
+        }
+      }
+
       for (int i = 0; i < numPages; i++) {
+        // Pre-render background if it's a PDF page
+        pw.MemoryImage? bgImage;
+        if (pageBackgrounds.length > i && pageBackgrounds[i] != null) {
+          final bg = pageBackgrounds[i]!;
+          if (bg.startsWith("pdf_page:")) {
+            if (bgPdf != null) {
+              try {
+                final pageNum = int.parse(bg.split(":").last);
+                final page = await bgPdf.getPage(pageNum);
+                final img = await page.render(
+                  width: page.width * 2,
+                  height: page.height * 2,
+                  format: px.PdfPageImageFormat.jpeg,
+                );
+                if (img != null) bgImage = pw.MemoryImage(img.bytes);
+                await page.close();
+              } catch (e) {
+                debugPrint("Error rendering PDF page for export: $e");
+              }
+            }
+          } else if (bg != "blank") {
+            // Legacy/Absolute path
+            try {
+              final file = File(bg);
+              if (await file.exists()) {
+                bgImage = pw.MemoryImage(await file.readAsBytes());
+              }
+            } catch (e) {
+              debugPrint("Error loading image background for export: $e");
+            }
+          }
+        }
+
         pdf.addPage(
           pw.Page(
             pageFormat: PdfPageFormat.a4,
@@ -365,10 +487,10 @@ class HandwrittenNote extends Note {
                 child: pw.Stack(
                   children: [
                     // Background Image
-                    if (pageBackgrounds.length > i && pageBackgrounds[i] != null && pageBackgrounds[i] != "blank")
+                    if (bgImage != null)
                       pw.Positioned.fill(
                         child: pw.Image(
-                          pw.MemoryImage(File(pageBackgrounds[i]!).readAsBytesSync()),
+                          bgImage,
                           fit: pw.BoxFit.contain,
                         ),
                       ),
@@ -413,7 +535,7 @@ class HandwrittenNote extends Note {
                             txt.text,
                             style: pw.TextStyle(
                               fontSize: txt.fontSize * scaleY,
-                              color: PdfColor.fromInt(txt.color.value),
+                              color: PdfColor.fromInt(txt.color.toARGB32()),
                             ),
                           ),
                         ),
@@ -516,6 +638,8 @@ class HandwrittenNote extends Note {
       );
     } catch (e) {
       debugPrint("Error exporting PDF: $e");
+    } finally {
+      await bgPdf?.close();
     }
   }
 }

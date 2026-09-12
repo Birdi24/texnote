@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-import '../../app_style.dart';
 import '../../models/Note.dart';
-import '../../models/collections.dart';
+import '../../models/folder.dart';
 import '../../models/TextNote.dart';
 import '../../models/HandwrittenNote.dart';
 import '../HandwrittenNoteScreen/main.dart';
 import '../../widgets/show_note_options.dart';
-import '../../widgets/show_collection_options.dart';
+import '../../widgets/show_folder_options.dart';
 import '../TextNoteScreen/main.dart';
 
 import 'nothing_view.dart';
@@ -19,21 +18,19 @@ import 'nothing_view.dart';
 Widget note_card({
   required BuildContext context,
   required Note note,
-  required List<Collection> collections,
-  required Future<void> Function() onNoteChanged,
+  required List<Folder> folders,
+  required Future<void> Function([Note?]) onNoteChanged,
   required void Function(Note) onNoteDeleted,
   required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
 }) {
 
   void showOptions() {
-    final index = 0;
-
     show_note_options(
       context,
       [note],
-      index,
-      collections,
+      0,
+      folders,
       onNoteChanged,
       onNoteDeleted,
       onNoteAdded,
@@ -45,6 +42,7 @@ Widget note_card({
     onLongPress: showOptions,
     onDoubleTap: showOptions,
     onTap: () async {
+      debugPrint("note_card.onTap: opening note ${note.title}");
       if (note.type == NoteType.TextNote) {
         await Navigator.push(
           context,
@@ -60,7 +58,8 @@ Widget note_card({
           ),
         );
       }
-      await onNoteChanged();
+      debugPrint("note_card.onTap: returned from note screen. note: ${note.title}");
+      await onNoteChanged(); // Force full refresh for now to troubleshoot
     },
 
     child: note.display(),
@@ -69,53 +68,41 @@ Widget note_card({
 
 
 // =============================================================================
-// COLLECTION CARD
+// FOLDER CARD
 // =============================================================================
-Widget collection_card({
+Widget folder_card({
   required BuildContext context,
-  required Collection collection,
-  required List<Collection> collections,
+  required Folder folder,
+  required List<Folder> allFolders,
   required List<Note> allNotes,
-  required Future<void> Function() onNoteChanged,
-  required void Function(Note) onNoteDeleted,
-  required void Function(Collection) onCollectionDeleted,
+  required Future<void> Function([Note?]) onNoteChanged,
+  required void Function(Folder) onFolderDeleted,
   required void Function(List<Note>) onNotesDeleted,
-  required void Function(Note) addToFavorites,
-  required void Function(Collection) openCollection,
+  required void Function(Folder) openFolder,
 }) {
   return GestureDetector(
     onLongPress: () {
-      final index = collections.indexOf(collection);
-      if (index != -1) {
-        show_collection_options(
-          context,
-          collections,
-          index,
-          allNotes,
-          onNoteChanged,
-          onCollectionDeleted,
-          onNotesDeleted,
-        );
-      }
+      show_folder_options(
+        context,
+        folder,
+        onNoteChanged,
+        onFolderDeleted,
+        onNotesDeleted,
+      );
     },
     onDoubleTap: () {
-      final index = collections.indexOf(collection);
-      if (index != -1) {
-        show_collection_options(
-          context,
-          collections,
-          index,
-          allNotes,
-          onNoteChanged,
-          onCollectionDeleted,
-          onNotesDeleted,
-        );
-      }
+      show_folder_options(
+        context,
+        folder,
+        onNoteChanged,
+        onFolderDeleted,
+        onNotesDeleted,
+      );
     },
     onTap: () {
-      openCollection(collection);
+      openFolder(folder);
     },
-    child: collection.display(),
+    child: folder.display(),
   );
 }
 
@@ -131,15 +118,14 @@ Widget _grid({required List<Widget> children, }) {
         // Grid constants
         const double maxExtent = 220;
         const double spacing = 12;
-        const double gridPadding = 40; // 20 (left) + 20 (right) inside the grid
+        const double gridPadding = 40; 
 
-        // Calculate actual width per item based on SliverGridDelegateWithMaxCrossAxisExtent logic
+        // Calculate actual width per item
         double usableWidth = constraints.maxWidth - gridPadding;
         int crossAxisCount = ((usableWidth + spacing) / (maxExtent + spacing)).ceil();
         crossAxisCount = math.max(1, crossAxisCount);
 
         double childWidth = (usableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
-
         double mainAxisExtent = (childWidth / 0.72) + 55;
 
         return GridView.builder(
@@ -176,75 +162,61 @@ Widget home_body({
   required BuildContext context,
   required List<Note> notes,
   required List<Note> displayedNotes,
-  required List<Collection> collections,
-  required Future<void> Function() onNoteChanged,
+  required List<Folder> folders,
+  required Future<void> Function([Note?]) onNoteChanged,
   required void Function(Note) onNoteDeleted,
-  required void Function(Collection) onCollectionDeleted,
+  required void Function(Folder) onFolderDeleted,
   required void Function(List<Note>) onNotesDeleted,
   required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
-  required void Function(Collection) openCollection,
-  required Collection? selectedCollection,
-  required bool inCollection,
+  required void Function(Folder) openFolder,
+  required Folder? selectedFolder,
+  required bool inFolder,
+  required List<Folder> allFolders,
 }) {
-  // ---------------------------------------------------------------------------
-  // COLLECTIONS
-  // ---------------------------------------------------------------------------
+  debugPrint("home_body.dart: control=$control, displayedNotesCount=${displayedNotes.length}, foldersCount=${folders.length}");
+  if (displayedNotes.isNotEmpty) {
+    debugPrint("   -> Sample notes: ${displayedNotes.take(3).map((n) => n.title).toList()}");
+  }
+  
+  List<Widget> gridChildren = [];
 
-  if (control == 0 && !inCollection) {
-    if (collections.isEmpty) {
-      return nothing_view(
-        context,
-        onNoteChanged,
-        collections,
-        notes,
-        control,
-        addToFavorites,
-        selectedCollection,
-      );
-    }
-
-    return _grid(
-      children: collections.map((collection) {
-        return collection_card(
-          context: context,
-          collection: collection,
-          collections: collections,
-          allNotes: notes,
-          onNoteChanged: onNoteChanged,
-          onNoteDeleted: onNoteDeleted,
-          onCollectionDeleted: onCollectionDeleted,
-          onNotesDeleted: onNotesDeleted,
-          addToFavorites: addToFavorites,
-          openCollection: openCollection
-        );
-      }).toList(),
-    );
+  // Add Folders first in Browser view
+  if (control == 1) {
+    gridChildren.addAll(folders.map((folder) => folder_card(
+      context: context,
+      folder: folder,
+      allFolders: folders,
+      allNotes: notes,
+      onNoteChanged: onNoteChanged,
+      onFolderDeleted: onFolderDeleted,
+      onNotesDeleted: onNotesDeleted,
+      openFolder: openFolder,
+    )));
   }
 
-  if (displayedNotes.isEmpty) {
+  // Add Notes
+  gridChildren.addAll(displayedNotes.map((note) => note_card(
+    context: context,
+    note: note,
+    folders: allFolders,
+    onNoteChanged: onNoteChanged,
+    onNoteDeleted: onNoteDeleted,
+    onNoteAdded: onNoteAdded,
+    addToFavorites: addToFavorites,
+  )));
+
+  if (gridChildren.isEmpty) {
     return nothing_view(
       context,
       onNoteChanged,
-      collections,
+      folders,
       notes,
       control,
       addToFavorites,
-      selectedCollection,
+      selectedFolder,
     );
   }
 
-  return _grid(
-    children: displayedNotes.map((note) {
-      return note_card(
-        context: context,
-        note: note,
-        collections: collections,
-        onNoteChanged: onNoteChanged,
-        onNoteDeleted: onNoteDeleted,
-        onNoteAdded: onNoteAdded,
-        addToFavorites: addToFavorites,
-      );
-    }).toList(),
-  );
+  return _grid(children: gridChildren);
 }

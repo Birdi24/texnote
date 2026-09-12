@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 /// Represents text in a handwritten note.
@@ -63,7 +62,7 @@ class TextData {
       'width': width,
       'height': height,
       'fontSize': fontSize,
-      'color': color.value,
+      'color': color.toARGB32(),
     };
   }
 

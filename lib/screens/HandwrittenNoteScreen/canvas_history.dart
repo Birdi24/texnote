@@ -70,13 +70,17 @@ class CanvasHistoryState {
       if (images[i].position != other.images[i].position ||
           images[i].width != other.images[i].width ||
           images[i].height != other.images[i].height ||
-          images[i].imagePath != other.images[i].imagePath) return false;
+          images[i].imagePath != other.images[i].imagePath) {
+        return false;
+      }
     }
     for (int i = 0; i < topImages.length; i++) {
       if (topImages[i].position != other.topImages[i].position ||
           topImages[i].width != other.topImages[i].width ||
           topImages[i].height != other.topImages[i].height ||
-          topImages[i].imagePath != other.topImages[i].imagePath) return false;
+          topImages[i].imagePath != other.topImages[i].imagePath) {
+        return false;
+      }
     }
     
     // Texts value check
@@ -84,13 +88,17 @@ class CanvasHistoryState {
       if (texts[i].text != other.texts[i].text || 
           texts[i].position != other.texts[i].position ||
           texts[i].fontSize != other.texts[i].fontSize ||
-          texts[i].color != other.texts[i].color) return false;
+          texts[i].color != other.texts[i].color) {
+        return false;
+      }
     }
     for (int i = 0; i < topTexts.length; i++) {
       if (topTexts[i].text != other.topTexts[i].text ||
           topTexts[i].position != other.topTexts[i].position ||
           topTexts[i].fontSize != other.topTexts[i].fontSize ||
-          topTexts[i].color != other.topTexts[i].color) return false;
+          topTexts[i].color != other.topTexts[i].color) {
+        return false;
+      }
     }
 
     // Backgrounds

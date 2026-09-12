@@ -37,70 +37,69 @@ class CanvasBackground extends StatelessWidget {
     this.pageBackgrounds = const [],
     this.resolvePageBackground,
     this.currentPage = 0,
-    this.windowRadius = 1,
+    this.windowRadius = 2,
   });
 
   @override
   Widget build(BuildContext context) {
     return OverflowBox(
-        maxHeight: double.infinity,
-        alignment: Alignment.topCenter, child:Column(
-      children: List.generate(
-        numPages,
-            (index) => Container(
-          width: pageWidth,
-          height: basePageHeight,
-          decoration: BoxDecoration(
-            color: BG,
-            border: Border(
-              bottom: BorderSide(
-                color: accent.withAlpha(70),
-                width: 2.0,
+      maxHeight: double.infinity,
+      alignment: Alignment.topCenter,
+      child: Column(
+        children: List.generate(
+          numPages,
+          (index) => Container(
+            width: pageWidth,
+            height: basePageHeight,
+            decoration: BoxDecoration(
+              color: BG,
+              border: Border(
+                bottom: BorderSide(
+                  color: icon_color.withAlpha(40),
+                  width: 1.0,
+                ),
               ),
             ),
-          ),
-          child: Stack(
-            children: [
-              _PageBackgroundImage(
-                key: ValueKey('page_bg_$index'),
-                pageIndex: index,
-                width: pageWidth,
-                height: basePageHeight,
-                knownPath: pageBackgrounds.length > index ? pageBackgrounds[index] : null,
-                resolver: resolvePageBackground,
-                inWindow: (index - currentPage).abs() <= windowRadius,
-              ),
-              if (paperType != "blank")
-                CustomPaint(
-                  size: Size(pageWidth, basePageHeight),
-                  painter: PaperPainter(paperType),
+            child: Stack(
+              children: [
+                _PageBackgroundImage(
+                  key: ValueKey('page_bg_$index'),
+                  pageIndex: index,
+                  width: pageWidth,
+                  height: basePageHeight,
+                  knownPath: pageBackgrounds.length > index ? pageBackgrounds[index] : null,
+                  resolver: resolvePageBackground,
+                  inWindow: (index - currentPage).abs() <= windowRadius,
                 ),
-              if (index > 0 || pageBackgrounds.isNotEmpty)
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Text(
-                      "Page ${index + 1}",
-                      style: AppStyles.icon_text.copyWith(
-                        fontSize: 14,
-                        color: accent.withAlpha(70),
-                        fontWeight: FontWeight.bold,
+                if (paperType != "blank")
+                  CustomPaint(
+                    size: Size(pageWidth, basePageHeight),
+                    painter: PaperPainter(paperType),
+                  ),
+                if (index > 0 || pageBackgrounds.isNotEmpty)
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(
+                        "Page ${index + 1}",
+                        style: AppStyles.icon_text.copyWith(
+                          fontSize: 14,
+                          color: icon_color.withAlpha(30),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }
 
-/// Only builds/holds a decoded image while [inWindow] is true. Evicts the
-/// underlying FileImage from Flutter's image cache as soon as the page
-/// scrolls out of the window, so far-away pages don't hold memory.
 class _PageBackgroundImage extends StatefulWidget {
   final int pageIndex;
   final double width;
@@ -138,12 +137,6 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
   @override
   void didUpdateWidget(covariant _PageBackgroundImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.knownPath != widget.knownPath) {
-      _evict();
-      _resolvedPath = widget.knownPath;
-    }
-
     if (widget.inWindow && !oldWidget.inWindow) {
       _load();
     } else if (!widget.inWindow && oldWidget.inWindow) {
@@ -152,41 +145,27 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
   }
 
   Future<void> _load() async {
-    // Explicitly blank page — NEVER ask the resolver for a PDF page.
-    if (_resolvedPath == "blank") {
-      return;
-    }
-
     var path = _resolvedPath;
+
+    // Check if it's a symbolic marker
+    if (path != null && path.startsWith("pdf_page:")) {
+      path = null;
+    }
 
     if (path == null && widget.resolver != null && !_resolving) {
       _resolving = true;
-
-      try {
-        path = await widget.resolver!(widget.pageIndex);
-
-        if (!mounted) return;
-
-        _resolvedPath = path;
-
-        if (path != null && path != "blank") {
-          _fileImage = FileImage(File(path));
-        }
-
-        setState(() {});
-      } finally {
-        _resolving = false;
-      }
-
+      path = await widget.resolver!(widget.pageIndex);
+      _resolving = false;
+      if (!mounted) return;
+      setState(() => _resolvedPath = path);
       return;
     }
 
     if (path != null && path != "blank" && mounted) {
-      setState(() {
-        _fileImage = FileImage(File(path!));
-      });
+      setState(() => _fileImage = FileImage(File(path!)));
     }
   }
+
   void _evict() {
     _fileImage?.evict();
     _fileImage = null;
@@ -200,9 +179,7 @@ class _PageBackgroundImageState extends State<_PageBackgroundImage> {
 
   @override
   Widget build(BuildContext context) {
-
     if (!widget.inWindow || _resolvedPath == null || _resolvedPath == "blank") {
-      // Reserves layout space with no decode cost.
       return SizedBox(width: widget.width, height: widget.height);
     }
     _fileImage ??= FileImage(File(_resolvedPath!));
@@ -223,7 +200,7 @@ class PaperPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = accent.withAlpha(70)
+      ..color = icon_color.withAlpha(30)
       ..strokeWidth = 0.5;
 
     if (paperType == "lined") {

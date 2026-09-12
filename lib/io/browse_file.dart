@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -47,10 +46,10 @@ class FileOpenerScreen {
         path: notePath,
         type: NoteType.HandwrittenNote,
         pdfSourcePath: pdfPath,
-        pageBackgrounds: List<String?>.filled(
+        pageBackgrounds: List.generate(
           pagesCount,
-          null,
-        ), // rendered lazily
+          (i) => "pdf_page:${i + 1}",
+        ),
       );
 
       await note.save("");
@@ -64,21 +63,35 @@ class FileOpenerScreen {
 
 // collects the notes from the directory to display on the home screen
 Future<List<Note>> collect() async {
+  debugPrint("collect() started");
   final stopwatch = Stopwatch()..start();
   final directory = await getApplicationDocumentsDirectory();
 
-  debugPrint("Directory: ${directory.path}");
+  final allEntities = directory.listSync(recursive: true);
+  debugPrint("collect(): found ${allEntities.length} entities in storage");
+  
+  final notePaths = allEntities
+      .where((e) => e.path.endsWith('.note'))
+      .map((e) => e.path)
+      .toSet();
 
-  final files = directory
-      .listSync(recursive: true)
-      .where(
-        (file) =>
-            (file.path.endsWith('.txt') ||
-                file.path.endsWith('.note')) &&
-            !file.uri.pathSegments.last.startsWith('.'),
-      )
-      .map((file) => File(file.path))
-      .toList();
+  final files = allEntities.where((file) {
+    final path = file.path;
+    if (file is! File) return false;
+    if (file.uri.pathSegments.last.startsWith('.')) return false;
+    if (path.contains('${Platform.pathSeparator}pdf_imports${Platform.pathSeparator}')) return false;
+
+    if (path.endsWith('.txt') || path.endsWith('.note')) return true;
+    
+    if (path.endsWith('.pdf')) {
+      // Only include raw PDF if no corresponding .note file exists
+      final notePath = path.replaceAll('.pdf', '.note');
+      return !notePaths.contains(notePath);
+    }
+    debugPrint("Unknown file type: $path");
+    
+    return false;
+  }).map((file) => File(file.path)).toList();
   debugPrint("Files found: ${files.length}");
 
   final noteFutures = files.map((file) async {
@@ -86,9 +99,28 @@ Future<List<Note>> collect() async {
     debugPrint("Processing file: $path");
     try {
       if (path.endsWith('.note')) {
-        return await HandwrittenNote.load(path);
+        return await HandwrittenNote.load(p.canonicalize(path));
+      } else if (path.endsWith('.pdf')) {
+        // Raw PDF: Wrap as HandwrittenNote with no strokes
+        int pagesCount = 1;
+        try {
+          final doc = await PdfDocument.openFile(path);
+          pagesCount = doc.pagesCount;
+          await doc.close();
+        } catch (e) {
+          debugPrint("Error reading PDF page count for $path: $e");
+        }
+
+        return HandwrittenNote(
+          title: p.basenameWithoutExtension(path),
+          path: p.canonicalize(path), // Use .pdf path initially; save() will switch to .note
+          date: await file.lastModified(),
+          type: NoteType.HandwrittenNote,
+          pdfSourcePath: path,
+          pageBackgrounds: List.generate(pagesCount, (i) => "pdf_page:${i + 1}"),
+        );
       } else {
-        return await TextNote.load(path);
+        return await TextNote.load(p.canonicalize(path));
       }
     } catch (e) {
       debugPrint("Error loading note at $path: $e");

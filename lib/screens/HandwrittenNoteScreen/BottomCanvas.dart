@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/HandwrittenNote.dart';
 import '../../models/stroke.dart';
 import 'HandwritingPainter.dart';
 

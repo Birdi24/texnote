@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -40,7 +39,9 @@ class TextNote extends Note {
   }
 
   /// saves a TextNote to a file
+  @override
   Future<void> save(String oldTitle) async {
+    debugPrint("TextNote.save(oldTitle: '$oldTitle') started for '$title'");
     try {
       String newTitle = sanitizeFileName(title.trim());
 
@@ -122,16 +123,17 @@ class TextNote extends Note {
       await file.writeAsString(body);
 
       title = newTitle;
-      path = file.path;
+      path = p.canonicalize(file.path);
       date = DateTime.now();
 
-      debugPrint("Saved: ${file.path}");
+      debugPrint("TextNote.save(): Saved to ${file.path}. Path updated to $path");
     } catch (e) {
       debugPrint("Error saving note: $e");
     }
   }
 
   /// creates a duplicate of a TextNote
+  @override
   Future<Note> duplicate_note() async {
     try {
       String newPath;
@@ -144,7 +146,7 @@ class TextNote extends Note {
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
       await file.writeAsString(body);
-      TextNote dup = TextNote(title :this.title+"-Copy",date: DateTime.now(),path: newPath, body: this.body, type: NoteType.TextNote);
+      TextNote dup = TextNote(title :"$title-Copy",date: DateTime.now(),path: newPath, body: body, type: NoteType.TextNote);
       return dup;
     }
     catch (e) {
@@ -171,6 +173,7 @@ class TextNote extends Note {
   }
 
   /// returns a widget representing the note
+  @override
   Widget display() {
     return Column(
       children: [

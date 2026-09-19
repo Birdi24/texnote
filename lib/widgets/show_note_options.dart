@@ -353,9 +353,10 @@ void change_handwritten_note_color_dialog(BuildContext context, List<Note> notes
             child: SingleChildScrollView(
               child: glassContainer(
                 bgAlpha: 10,
+                color: BG,
                 borderAlpha: 244,
                 borderColor: collection_color(currentSelected),
-                height: 560,
+                height: 225,
                 width: screenWidth > 420 ? 370 : screenWidth - 50,
                 shadowColor: BG,
                 child: Padding(
@@ -366,9 +367,8 @@ void change_handwritten_note_color_dialog(BuildContext context, List<Note> notes
                       const SizedBox(height: 12),
                       const Text("Cover Color", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 25),
-                      ColorPicker(
+                      HomeColorPicker(
                         initialColor: currentSelected,
-                        showFullPicker: true,
                         onColorChanged: (color, identifier) {
                           setState(() {
                             currentSelected = identifier ?? "#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
@@ -388,7 +388,6 @@ void change_handwritten_note_color_dialog(BuildContext context, List<Note> notes
                             style: ElevatedButton.styleFrom(
                               backgroundColor: collection_color(currentSelected),
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () async {
                               note.cover = currentSelected;

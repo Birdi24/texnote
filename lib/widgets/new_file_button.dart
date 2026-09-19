@@ -56,7 +56,7 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
                       );
                       
                       // Save and refresh in background to ensure Home Screen is ready on return
-                      run_async(note.save, onNoteCreated);
+                      run_async(note.save, () => onNoteCreated(note));
                       
                       if (context.mounted) {
                         await Navigator.push(
@@ -98,7 +98,7 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
                           addOrRemoveFavorite(note);
                         }
                         // Move and refresh in background
-                        run_async((_) => note.save(""), onNoteCreated);
+                        run_async((_) => note.save(""), () => onNoteCreated(note));
                         
                         await Navigator.push(
                           context,

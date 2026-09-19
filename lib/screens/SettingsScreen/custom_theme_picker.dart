@@ -570,13 +570,12 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
         ),
       ),
       content: SingleChildScrollView(child:SizedBox(
-        height: 420,
+        height: 480,
         width: 300,
-        child: ColorPicker(
+        child: NoteColorPicker(
           initialColor: widget.initialColor,
           history: widget.history,
-          showFullPicker: true,
-          onColorChanged: (color, identifier) {
+          onColorChanged: (color) {
             selectedColor = color;
           },
         ),

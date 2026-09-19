@@ -77,9 +77,8 @@ Future<void> on_new_handwritten_note(
                       ),
                       const SizedBox(height: 10),
 
-                      ColorPicker(
+                      HomeColorPicker(
                         initialColor: selectedColor,
-                        showFullPicker: true,
                         onColorChanged: (color, identifier) {
                           setState(() {
                             selectedColor = identifier ?? "#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}";
@@ -133,7 +132,7 @@ Future<void> on_new_handwritten_note(
                               note.cover = selectedColor;
                               
                               // Save immediately so it exists on disk before opening
-                              run_async(note.save,  onNoteCreated);
+                              run_async(note.save, () => onNoteCreated(note));
 
                               
                               await Navigator.push<bool>(

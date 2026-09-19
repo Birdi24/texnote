@@ -133,63 +133,73 @@ Widget left_button_array(
       Function(double)? onSizeDelta,
       VoidCallback? onSwitchEraserType,
       Color currentPenColor = BLACK,
-      Color secondaryPenColor = Colors.indigo,
+      List<Color> quickColors = const [],
       Function(Color)? onColorChanged,
       VoidCallback? onOpenColorPicker,
     }) {
   final screenWidth = MediaQuery.of(context).size.width;
-  return (DrawingTool.duplicate != selectedTool ) ? glassContainer(
-      width: 55,
-      height: selectedTool == DrawingTool.eraser2 ? 148 : 318,
-      child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            single_circle_button(
-                LucideIcons.plus,
-                20.0,
-                90,
-                "plus",
-                () => onIncrementSize?.call(),
-                context,
-                screenWidth,
-                button_width: 35.0,
-                bgAlpha: 160
-            ),
+  final screenHeight = MediaQuery.of(context).size.height;
 
-            GestureDetector(
-              onVerticalDragUpdate: (details) {
-                onSizeDelta?.call(-details.delta.dy * 0.05);
-              },
-              child: glassContainer(
-                width: 35, height: 35, radius: 20,
-                borderAlpha: 90,
-                bgAlpha: 160,
-                child: Center(
-                  child: Text(
-                    currentSize.toStringAsFixed(1),
-                    style: AppStyles.icon_text.copyWith(fontSize: 12, fontWeight: FontWeight.bold),
+  return (DrawingTool.duplicate != selectedTool ) ? ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: screenHeight - 180),
+      child: glassContainer(
+          width: 55,
+          height: 0, // Setting height to 0 makes it adaptive in glassContainer
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  single_circle_button(
+                      LucideIcons.plus,
+                      20.0,
+                      90,
+                      "plus",
+                      () => onIncrementSize?.call(),
+                      context,
+                      screenWidth,
+                      button_width: 35.0,
+                      bgAlpha: 160
                   ),
-                ),
-              ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onVerticalDragUpdate: (details) {
+                      onSizeDelta?.call(-details.delta.dy * 0.05);
+                    },
+                    child: glassContainer(
+                      width: 35, height: 35, radius: 20,
+                      borderAlpha: 90,
+                      bgAlpha: 160,
+                      child: Center(
+                        child: Text(
+                          currentSize.toStringAsFixed(1),
+                          style: AppStyles.icon_text.copyWith(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  single_circle_button(
+                      LucideIcons.minus,
+                      20.0,
+                      90,
+                      "minus",
+                      () => onDecrementSize?.call(),
+                      context,
+                      screenWidth,
+                      button_width: 35.0,
+                      bgAlpha: 160),
+                  const SizedBox(height: 10),
+                  if (selectedTool != DrawingTool.eraser2)
+                    pen_further_options(context, screenWidth, currentPenColor, quickColors, onColorChanged, onOpenColorPicker),
+                  const SizedBox(height: 10),
+                ]
             ),
-
-            single_circle_button(
-                LucideIcons.minus,
-                20.0,
-                90,
-                "minus",
-                () => onDecrementSize?.call(),
-                context,
-                screenWidth,
-                button_width: 35.0,
-                bgAlpha: 160),
-
-            if (selectedTool != DrawingTool.eraser2)
-               pen_further_options(context, screenWidth, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker)
-          ]
+          )
       )
-    ) : SizedBox.shrink();
-  }
+  ) : SizedBox.shrink();
+}
 
 Widget color_button(Color color, VoidCallback onTap, {bool hasOutline = false}) {
   return GestureDetector(
@@ -213,22 +223,28 @@ Widget color_button(Color color, VoidCallback onTap, {bool hasOutline = false}) 
   );
 }
 
-Widget pen_further_options(context, screenWidth, currentPenColor, secondaryPenColor, onColorChanged, onOpenColorPicker) {
+Widget pen_further_options(context, screenWidth, currentPenColor, List<Color> quickColors, onColorChanged, onOpenColorPicker) {
   return Column(
       children: [
          Divider(height: 1, indent: 15, endIndent: 15, color: icon_color),
-        const SizedBox(height: 14,),
-        color_button(
-            currentPenColor,
-            () {}, // Already selected
-            hasOutline: true
+        const SizedBox(height: 10,),
+        Column(
+          children: [
+            color_button(
+                currentPenColor,
+                () {}, // Already selected
+                hasOutline: true
+            ),
+            ...quickColors.where((c) => c.value != currentPenColor.value).map((color) => Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: color_button(
+                  color,
+                  () => onColorChanged?.call(color)
+              ),
+            )),
+          ],
         ),
-        const SizedBox(height: 14,),
-        color_button(
-            secondaryPenColor,
-            () => onColorChanged?.call(secondaryPenColor)
-        ),
-        const SizedBox(height: 14,),
+        const SizedBox(height: 10,),
         single_circle_button(
             LucideIcons.palette,
             20.0,

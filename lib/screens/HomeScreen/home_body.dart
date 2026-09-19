@@ -76,7 +76,7 @@ Widget folder_card({
   required List<Folder> allFolders,
   required List<Note> allNotes,
   required Future<void> Function([Note?]) onNoteChanged,
-  required void Function(Folder) onFolderDeleted,
+  required Future<void> Function(Folder) onFolderDeleted,
   required void Function(List<Note>) onNotesDeleted,
   required void Function(Folder) openFolder,
 }) {
@@ -85,6 +85,8 @@ Widget folder_card({
       show_folder_options(
         context,
         folder,
+        allNotes,
+        allFolders,
         onNoteChanged,
         onFolderDeleted,
         onNotesDeleted,
@@ -94,6 +96,8 @@ Widget folder_card({
       show_folder_options(
         context,
         folder,
+        allNotes,
+        allFolders,
         onNoteChanged,
         onFolderDeleted,
         onNotesDeleted,
@@ -105,7 +109,6 @@ Widget folder_card({
     child: folder.display(),
   );
 }
-
 
 // =============================================================================
 // GRID
@@ -165,7 +168,7 @@ Widget home_body({
   required List<Folder> folders,
   required Future<void> Function([Note?]) onNoteChanged,
   required void Function(Note) onNoteDeleted,
-  required void Function(Folder) onFolderDeleted,
+  required Future<void> Function(Folder) onFolderDeleted,
   required void Function(List<Note>) onNotesDeleted,
   required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,

@@ -186,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen>
     saveAppState();
   }
 
-  void onFolderDeleted(Folder folder) {
+  Future<void> onFolderDeleted(Folder folder) async {
     setState(() {
       if (folder.parent != null) {
         folder.parent!.subfolders.remove(folder);
@@ -197,6 +197,7 @@ class _HomeScreenState extends State<HomeScreen>
         _currentFolder = folder.parent;
       }
     });
+    await init_files();
     saveAppState();
   }
 
@@ -226,6 +227,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> onNoteChanged([Note? note]) async {
     debugPrint("main.dart: onNoteChanged(note: ${note?.title})");
+
+    if (note != null && !allNotes.contains(note)) {
+      allNotes.add(note);
+    }
 
     // Remember where the user currently is before rebuilding
     // the folder tree.
@@ -323,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen>
                       folders: [],
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
-                      onFolderDeleted: (_) {},
+                      onFolderDeleted: (_) async {},
                       onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
                       addToFavorites: add_or_remove_favorite,
@@ -369,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen>
                       folders: [],
                       onNoteChanged: onNoteChanged,
                       onNoteDeleted: onNoteDeleted,
-                      onFolderDeleted: (_) {},
+                      onFolderDeleted: (_) async {},
                       onNotesDeleted: onNotesDeleted,
                       onNoteAdded: onNoteAdded,
                       addToFavorites: add_or_remove_favorite,

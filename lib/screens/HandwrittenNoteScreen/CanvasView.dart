@@ -75,10 +75,14 @@ class CanvasViewState extends State<CanvasView> {
   static const Duration _stylusDoublePressWindow = Duration(milliseconds: 300);
   bool _stylusButtonHeld = false;
 
-  Color _primaryColor = BLACK;
-  Color _secondaryColor = Colors.indigo.shade900;
+  Color _primaryColor = Colors.indigo.shade900;
+  Color _secondaryColor = BLACK;
+  Color _thirdColor = Colors.red.shade700;
+  Color _fourthColor = Colors.yellow.shade600;
   Color _highlighterPrimaryColor = Colors.yellow.withAlpha(77);
   Color _highlighterSecondaryColor = Colors.green.withAlpha(77);
+  Color _highlighterThirdColor = Colors.orange.withAlpha(77);
+  Color _highlighterFourthColor = Colors.pink.withAlpha(77);
   bool _showColorPicker = false;
 
   late double _pageWidth;
@@ -111,6 +115,11 @@ class CanvasViewState extends State<CanvasView> {
     _transformationController.addListener(_onTransformationChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _recordHistory();
+      if (_selectedTool == DrawingTool.pen) {
+        widget.topCanvasKey.currentState?.setColor(_primaryColor);
+      } else if (_selectedTool == DrawingTool.highlighter) {
+        widget.topCanvasKey.currentState?.setColor(_highlighterPrimaryColor);
+      }
     });
   }
 
@@ -493,7 +502,7 @@ class CanvasViewState extends State<CanvasView> {
 
       widget.topCanvasKey.currentState?.setTool(tool);
 
-      if (tool == DrawingTool.pen) {
+      if (tool == DrawingTool.pen || tool == DrawingTool.text) {
         widget.topCanvasKey.currentState?.setColor(_primaryColor);
       } else if (tool == DrawingTool.highlighter) {
         widget.topCanvasKey.currentState?.setColor(_highlighterPrimaryColor);
@@ -844,20 +853,38 @@ class CanvasViewState extends State<CanvasView> {
   void _onColorChanged(Color color) {
     setState(() {
       if (_selectedTool == DrawingTool.highlighter) {
-        final highlighterColor = color.withAlpha(70);
-        if (highlighterColor == _highlighterSecondaryColor) {
+        // Standardize alpha for highlighter comparisons and storage
+        final highlighterColor = color.withAlpha(77);
+        
+        if (highlighterColor.value == _highlighterSecondaryColor.value) {
           final temp = _highlighterPrimaryColor;
           _highlighterPrimaryColor = _highlighterSecondaryColor;
           _highlighterSecondaryColor = temp;
+        } else if (highlighterColor.value == _highlighterThirdColor.value) {
+          final temp = _highlighterPrimaryColor;
+          _highlighterPrimaryColor = _highlighterThirdColor;
+          _highlighterThirdColor = temp;
+        } else if (highlighterColor.value == _highlighterFourthColor.value) {
+          final temp = _highlighterPrimaryColor;
+          _highlighterPrimaryColor = _highlighterFourthColor;
+          _highlighterFourthColor = temp;
         } else {
           _highlighterPrimaryColor = highlighterColor;
         }
         widget.topCanvasKey.currentState?.setColor(_highlighterPrimaryColor);
       } else {
-        if (color == _secondaryColor) {
+        if (color.value == _secondaryColor.value) {
           final temp = _primaryColor;
           _primaryColor = _secondaryColor;
           _secondaryColor = temp;
+        } else if (color.value == _thirdColor.value) {
+          final temp = _primaryColor;
+          _primaryColor = _thirdColor;
+          _thirdColor = temp;
+        } else if (color.value == _fourthColor.value) {
+          final temp = _primaryColor;
+          _primaryColor = _fourthColor;
+          _fourthColor = temp;
         } else {
           _primaryColor = color;
         }
@@ -1118,9 +1145,17 @@ class CanvasViewState extends State<CanvasView> {
                           currentPenColor: (_selectedTool == DrawingTool.highlighter)
                               ? _highlighterPrimaryColor
                               : _primaryColor,
-                          secondaryPenColor: (_selectedTool == DrawingTool.highlighter)
-                              ? _highlighterSecondaryColor
-                              : _secondaryColor,
+                          quickColors: (_selectedTool == DrawingTool.highlighter)
+                              ? [
+                                  _highlighterSecondaryColor,
+                                  _highlighterThirdColor,
+                                  _highlighterFourthColor,
+                                ]
+                              : [
+                                  _secondaryColor,
+                                  _thirdColor,
+                                  _fourthColor,
+                                ],
                           onColorChanged: _onColorChanged,
                           onOpenColorPicker: () => setState(() => _showColorPicker = !_showColorPicker),
                         ),

@@ -18,21 +18,19 @@ class CanvasColorPickerOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return glassContainer(
-      width: 200,
-      height: 272,
+      width: 205,
+      height: 332,
       radius: 25,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             Expanded(
-              child: ColorPicker(
+              child: NoteColorPicker(
                 initialColor: initialColor,
-                showFullPicker: true,
-                onColorChanged: (color, identifier) {
+                onColorChanged: (color) {
                   onColorChanged(color);
                 },
-                width: 168,
               ),
             ),
 

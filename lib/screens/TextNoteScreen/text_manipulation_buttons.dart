@@ -135,12 +135,12 @@ Widget color_button(BuildContext context, QuillController bodyController) {
                 backgroundColor: BG,
                 title: Text('Text Color', style: AppStyles.bodytext.copyWith(color: icon_color)),
                 content: SizedBox(
-                  height: 420,
-                  width: 300,
-                  child: ColorPicker(
+                  height: 480,
+                  width: 275,
+                  child: NoteColorPicker(
                     initialColor: selectedColor,
                     history: textHistory,
-                    onColorChanged: (color, identifier) {
+                    onColorChanged: (color) {
                       selectedColor = color;
                     },
                   ),
@@ -197,12 +197,12 @@ Widget highlight_button(BuildContext context, QuillController bodyController) {
                 backgroundColor: BG,
                 title: Text('Highlight Color', style: AppStyles.bodytext.copyWith(color: icon_color)),
                 content: SizedBox(
-                  height: 420,
-                  width: 300,
-                  child: ColorPicker(
+                  height: 480,
+                  width: 275,
+                  child: NoteColorPicker(
                     initialColor: selectedColor,
                     history: highlightHistory,
-                    onColorChanged: (color, identifier) {
+                    onColorChanged: (color) {
                       selectedColor = color;
                     },
                   ),

@@ -48,3 +48,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   image_path: "BirdWrite.png"
   min_sdk_android: 21
+  windows:
+    generate: true
+    image_path: "BirdWrite.png"
+    icon_size: 256

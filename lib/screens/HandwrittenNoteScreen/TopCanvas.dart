@@ -46,8 +46,8 @@ class TopCanvasState extends State<TopCanvas> {
   final LassoManager _lassoManager = LassoManager();
   Offset? _lastPointerPos;
 
-  double _penSize = 3.0;
-  double _eraserSize = 10.0;
+  double _penSize = 1.0;
+  double _eraserSize = 1.0;
   double _highlighterSize = 10.0;
   double _fontSize = 20.0;
   DrawingTool _selectedTool = DrawingTool.pen;
@@ -55,7 +55,7 @@ class TopCanvasState extends State<TopCanvas> {
   static const int kMaxPointsPerSegment = 300;
   static const int kSegmentOverlap = 8;
 
-  double penSize = 3.0;
+  double penSize = 1.0;
   Color penColor = icon_color;
   int topStrokeLen = 0;
 
@@ -346,6 +346,31 @@ class TopCanvasState extends State<TopCanvas> {
   List<Stroke> getStrokes() => [..._toplayer, ..._lassoManager.selectedStrokes];
   List<ImageData> getImages() => [..._topLayerImages, ..._lassoManager.selectedImages];
   List<TextData> getTexts() => [..._topLayerTexts, ..._lassoManager.selectedTexts];
+
+  void flush() {
+    final strokesToCommit = getStrokes();
+    if (_currentStroke != null) {
+      strokesToCommit.add(_currentStroke!);
+      _currentStroke = null;
+    }
+    final imagesToCommit = getImages();
+    final textsToCommit = getTexts();
+
+    if (strokesToCommit.isEmpty && imagesToCommit.isEmpty && textsToCommit.isEmpty) return;
+
+    _lassoManager.selectedStrokes = [];
+    _lassoManager.selectedImages = [];
+    _lassoManager.selectedTexts = [];
+    _lassoManager.selectionRect = null;
+
+    _toplayer.clear();
+    _topLayerImages.clear();
+    _topLayerTexts.clear();
+    topStrokeLen = 0;
+
+    widget.onCommit(strokesToCommit, imagesToCommit, textsToCommit);
+    setState(() {});
+  }
 
   void shiftContent(double thresholdY, Offset delta) {
     setState(() {

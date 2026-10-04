@@ -46,9 +46,12 @@ class FileOpenerScreen {
         path: notePath,
         type: NoteType.HandwrittenNote,
         pdfSourcePath: pdfPath,
-        pageBackgrounds: List.generate(
+        pages: List.generate(
           pagesCount,
-          (i) => "pdf_page:${i + 1}",
+          (i) => NotePage(
+            background: "pdf_page:${i + 1}",
+            source: PageSource.pdf(i + 1),
+          ),
         ),
       );
 
@@ -117,7 +120,13 @@ Future<List<Note>> collect() async {
           date: await file.lastModified(),
           type: NoteType.HandwrittenNote,
           pdfSourcePath: path,
-          pageBackgrounds: List.generate(pagesCount, (i) => "pdf_page:${i + 1}"),
+          pages: List.generate(
+            pagesCount,
+            (i) => NotePage(
+              background: "pdf_page:${i + 1}",
+              source: PageSource.pdf(i + 1),
+            ),
+          ),
         );
       } else {
         return await TextNote.load(p.canonicalize(path));

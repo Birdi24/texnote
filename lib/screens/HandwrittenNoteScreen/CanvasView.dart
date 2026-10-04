@@ -23,36 +23,32 @@ import 'canvas_options.dart';
 import 'canvas_transformation_controller.dart';
 import 'CanvasScrollbar.dart';
 
+import '../../models/HandwrittenNote.dart';
+
 class CanvasView extends StatefulWidget {
-  final List<Stroke> bottomLayerStrokes;
-  final List<ImageData> images;
-  final List<TextData> texts;
+  final List<NotePage> pages;
   final void Function(List<Stroke> strokes, List<ImageData> images, List<TextData> texts) onCommit;
-  final GlobalKey<BottomCanvasState> bottomCanvasKey;
   final GlobalKey<TopCanvasState> topCanvasKey;
   final Future<void> Function() onSave;
   final bool changed;
   final VoidCallback onChanged;
   final String paperType;
-  final List<String?> pageBackgrounds;
   final PageBackgroundResolver? resolvePageBackground;
   final ValueChanged<int>? onPageChanged;
+  final Future<void> Function()? onBack;
 
   const CanvasView({
     super.key,
-    required this.bottomLayerStrokes,
-    required this.images,
-    required this.texts,
+    required this.pages,
     required this.onCommit,
-    required this.bottomCanvasKey,
     required this.topCanvasKey,
     required this.onSave,
     required this.changed,
     required this.onChanged,
     required this.paperType,
-    this.pageBackgrounds = const [],
-    this.resolvePageBackground,
-    this.onPageChanged,
+    required this.resolvePageBackground,
+    required this.onPageChanged,
+    this.onBack, // NEW
   });
 
   @override
@@ -98,17 +94,15 @@ class CanvasViewState extends State<CanvasView> {
   double _maxContentY = 0.0;
 
   // Cache rasterized page thumbnails to prevent vector re-paints
-  final Map<int, ui.Image> _thumbnailCache = {};
+  final Map<String, ui.Image> _thumbnailCache = {};
 
   @override
   void initState() {
     super.initState();
-    if (widget.pageBackgrounds.isNotEmpty) {
-      _numPages = widget.pageBackgrounds.length;
-    } else {
-      widget.pageBackgrounds.add(null);
-      _numPages = 1;
+    if (widget.pages.isEmpty) {
+      widget.pages.add(NotePage(source: PageSource.blank()));
     }
+    _numPages = widget.pages.length;
 
     _recomputeContentBounds();
 
@@ -146,38 +140,12 @@ class CanvasViewState extends State<CanvasView> {
   }
 
   void _recomputeContentBounds() {
-    double maxY = 0.0;
-    for (final stroke in widget.bottomLayerStrokes) {
-      final b = stroke.getBounds();
-      if (b.bottom > maxY) maxY = b.bottom;
-    }
-    for (final img in widget.images) {
-      final b = img.getBounds();
-      if (b.bottom > maxY) maxY = b.bottom;
-    }
-    for (final txt in widget.texts) {
-      final b = txt.getBounds();
-      if (b.bottom > maxY) maxY = b.bottom;
-    }
-    _maxContentY = maxY;
-  }
-
-  void _updateContentBoundsWithStroke(Stroke stroke) {
-    final b = stroke.getBounds();
-    if (b.bottom > _maxContentY) {
-      _maxContentY = b.bottom;
-    }
-  }
-
-  void _updateContentBoundsWithImage(ImageData image) {
-    final b = image.getBounds();
-    if (b.bottom > _maxContentY) {
-      _maxContentY = b.bottom;
-    }
+    _numPages = widget.pages.length;
+    _pageHeight = _basePageHeight * _numPages;
   }
 
   Future<void> _updateThumbnailCache(int pageIndex) async {
-    if (_basePageHeight <= 0 || _pageWidth <= 0) return;
+    if (_basePageHeight <= 0 || _pageWidth <= 0 || pageIndex >= widget.pages.length) return;
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -187,57 +155,39 @@ class CanvasViewState extends State<CanvasView> {
     final bgPaint = Paint()..color = Colors.white;
     canvas.drawRect(pageRect, bgPaint);
 
-    final pageStartY = pageIndex * _basePageHeight;
-    final pageEndY = (pageIndex + 1) * _basePageHeight;
+    final page = widget.pages[pageIndex];
 
-    // Render bottom strokes relative to current page bounds
-    for (final stroke in widget.bottomLayerStrokes) {
+    for (final stroke in page.strokes) {
       if (stroke.points.isEmpty) continue;
+      final paint = Paint()
+        ..color = stroke.color
+        ..strokeWidth = stroke.size
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
 
-      final bounds = stroke.getBounds();
-      if (bounds.bottom >= pageStartY && bounds.top <= pageEndY) {
-        final paint = Paint()
-          ..color = stroke.color
-          ..strokeWidth = stroke.size
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..style = PaintingStyle.stroke;
-
-        final path = Path();
-        final firstPoint = stroke.points.first;
-        path.moveTo(firstPoint.dx, firstPoint.dy - pageStartY);
-
-        for (int i = 1; i < stroke.points.length; i++) {
-          final pt = stroke.points[i];
-          path.lineTo(pt.dx, pt.dy - pageStartY);
-        }
-
-        canvas.drawPath(path, paint);
+      final path = Path();
+      path.moveTo(stroke.points.first.dx, stroke.points.first.dy);
+      for (int i = 1; i < stroke.points.length; i++) {
+        path.lineTo(stroke.points[i].dx, stroke.points[i].dy);
       }
+      canvas.drawPath(path, paint);
     }
-
-    // Rasterize
+    // ... Simplified for thumbnail ...
     final picture = recorder.endRecording();
     const double thumbnailWidth = 150.0;
     final double scale = thumbnailWidth / _pageWidth;
     final int thumbnailHeight = (_basePageHeight * scale).toInt();
-
     final imageRecorder = ui.PictureRecorder();
     final imageCanvas = Canvas(imageRecorder);
     imageCanvas.scale(scale, scale);
     imageCanvas.drawPicture(picture);
-
     final scaledPicture = imageRecorder.endRecording();
-    final newImage = await scaledPicture.toImage(
-      thumbnailWidth.toInt(),
-      thumbnailHeight,
-    );
-
+    final newImage = await scaledPicture.toImage(thumbnailWidth.toInt(), thumbnailHeight);
     if (mounted) {
       setState(() {
-        // Swap out old image and dispose it only AFTER new image is ready
-        final oldImage = _thumbnailCache[pageIndex];
-        _thumbnailCache[pageIndex] = newImage;
+        final oldImage = _thumbnailCache[page.id];
+        _thumbnailCache[page.id] = newImage;
         oldImage?.dispose();
       });
     } else {
@@ -271,13 +221,9 @@ class CanvasViewState extends State<CanvasView> {
     final topImages = widget.topCanvasKey.currentState?.getImages() ?? [];
     final topTexts = widget.topCanvasKey.currentState?.getTexts() ?? [];
     _historyManager.record(
-      widget.bottomLayerStrokes,
+      widget.pages,
       topStrokes,
-      _numPages,
-      widget.images,
-      widget.pageBackgrounds,
       topImages: topImages,
-      texts: widget.texts,
       topTexts: topTexts,
     );
     _updateThumbnailCache(_currentPageIndex);
@@ -286,28 +232,25 @@ class CanvasViewState extends State<CanvasView> {
   }
 
   void _applyHistoryState(CanvasHistoryState state) {
-    _numPages = state.numPages;
+    _numPages = state.pages.length;
     _pageHeight = _basePageHeight * _numPages;
 
-    widget.bottomLayerStrokes.clear();
-    widget.bottomLayerStrokes.addAll(state.bottomLayer.map((s) => s.copy()).toList());
-    widget.images.clear();
-    widget.images.addAll(state.images.map((i) => i.copy()).toList());
-    widget.texts.clear();
-    widget.texts.addAll(state.texts.map((t) => t.copy()).toList());
-
-    widget.pageBackgrounds.clear();
-    widget.pageBackgrounds.addAll(state.pageBackgrounds);
+    widget.pages.clear();
+    widget.pages.addAll(state.pages.map((page) => NotePage(
+      id: page.id,
+      strokes: page.strokes.map((s) => s.copy()).toList(),
+      images: page.images.map((i) => i.copy()).toList(),
+      texts: page.texts.map((t) => t.copy()).toList(),
+      background: page.background,
+      source: PageSource(type: page.source.type, originalIndex: page.source.originalIndex),
+    )).toList());
 
     _recomputeContentBounds();
-
-    // Clear stale thumbnails and queue fresh renders
     _clearThumbnailCache();
     for (int i = 0; i < _numPages; i++) {
       _updateThumbnailCache(i);
     }
 
-    widget.bottomCanvasKey.currentState?.update();
     widget.topCanvasKey.currentState?.setStrokes(state.topLayer.map((s) => s.copy()).toList());
     widget.topCanvasKey.currentState?.setImages((state.topImages).map((i) => i.copy()).toList());
     widget.topCanvasKey.currentState?.setTexts((state.topTexts).map((t) => t.copy()).toList());
@@ -318,17 +261,7 @@ class CanvasViewState extends State<CanvasView> {
     _basePageHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
     _pageWidth = _basePageHeight * .707;
 
-    // Optimized O(1) page bounds calculation using imperatively tracked _maxContentY
-    if (_basePageHeight > 0) {
-      int contentPages = (_maxContentY / _basePageHeight).ceil();
-      if (contentPages > _numPages) {
-        _numPages = contentPages;
-        while (widget.pageBackgrounds.length < _numPages) {
-          widget.pageBackgrounds.add(null);
-        }
-      }
-    }
-
+    _numPages = widget.pages.length;
     _pageHeight = _basePageHeight * _numPages;
 
     _transformationController.initialize(
@@ -472,18 +405,21 @@ class CanvasViewState extends State<CanvasView> {
 
       final centerX = (-offset.dx + viewportSize.width / 2) / zoom;
       final centerY = (-offset.dy + viewportSize.height / 2) / zoom;
+      
+      final int pageIdx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+      final relativePos = Offset(centerX - 100, (centerY - 100) - (pageIdx * _basePageHeight));
 
       final newImageData = ImageData(
-        position: Offset(centerX - 100, centerY - 100),
+        position: relativePos,
         imagePath: newPath,
       );
 
       setState(() {
-        widget.images.add(newImageData);
-        _updateContentBoundsWithImage(newImageData);
+        widget.pages[pageIdx].images.add(newImageData);
       });
       widget.onChanged();
       _recordHistory();
+      _updateThumbnailCache(pageIdx);
     }
   }
 
@@ -513,52 +449,19 @@ class CanvasViewState extends State<CanvasView> {
   void _addPage(Size viewportSize, {int? atIndex}) {
     final insertIndex = atIndex != null ? atIndex + 1 : _currentPageIndex + 1;
     setState(() {
-      _numPages++;
-
-      widget.pageBackgrounds.insert(
-        insertIndex.clamp(0, widget.pageBackgrounds.length),
-        "blank",
+      widget.pages.insert(
+        insertIndex.clamp(0, widget.pages.length),
+        NotePage(source: PageSource.blank()),
       );
 
+      _recomputeContentBounds();
+      
       final thresholdY = insertIndex * _basePageHeight;
       final shiftDelta = Offset(0, _basePageHeight);
-
-      for (int i = 0; i < widget.bottomLayerStrokes.length; i++) {
-        final stroke = widget.bottomLayerStrokes[i];
-        if (stroke.getBounds().top >= thresholdY - 1.0) {
-          widget.bottomLayerStrokes[i] = stroke.translate(shiftDelta);
-        }
-      }
-
-      for (int i = 0; i < widget.images.length; i++) {
-        final img = widget.images[i];
-        if (img.position.dy >= thresholdY - 1.0) {
-          widget.images[i] = img.translate(shiftDelta);
-        }
-      }
-      
-      for (int i = 0; i < widget.texts.length; i++) {
-        final txt = widget.texts[i];
-        if (txt.position.dy >= thresholdY - 1.0) {
-          widget.texts[i] = txt.translate(shiftDelta);
-        }
-      }
-
-      _recomputeContentBounds();
       widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
-      _pageHeight = _basePageHeight * _numPages;
 
-      // Shift cached thumbnails down by 1 for all shifted pages
-      final Map<int, ui.Image> updatedCache = {};
-      _thumbnailCache.forEach((pageIdx, image) {
-        if (pageIdx >= insertIndex) {
-          updatedCache[pageIdx + 1] = image;
-        } else {
-          updatedCache[pageIdx] = image;
-        }
-      });
-      _thumbnailCache.clear();
-      _thumbnailCache.addAll(updatedCache);
+      // Thumbnail cache remains valid for existing pages since it's ID-based.
+      // We don't need to shift anything in _thumbnailCache anymore.
 
       if (atIndex == null) {
         _transformationController.setOffset(
@@ -570,11 +473,50 @@ class CanvasViewState extends State<CanvasView> {
       }
     });
 
-    widget.bottomCanvasKey.currentState?.update();
     _recordHistory();
+    _updateThumbnailCache(insertIndex);
+  }
 
-    // Rasterize the new blank page
-    _updateThumbnailCache(_currentPageIndex +1);
+  void _duplicatePage(Size viewportSize, {int? atIndex}) {
+    final index = atIndex ?? _currentPageIndex;
+    final original = widget.pages[index];
+
+    final duplicate = NotePage(
+      source: PageSource(
+        type: original.source.type,
+        originalIndex: original.source.originalIndex,
+      ),
+      strokes: original.strokes.map((s) => s.copy()).toList(),
+      images: original.images.map((i) => i.copy()).toList(),
+      texts: original.texts.map((t) => t.copy()).toList(),
+      background: original.background,
+    );
+
+    setState(() {
+      final insertIndex = index + 1;
+      widget.pages.insert(
+        insertIndex.clamp(0, widget.pages.length),
+        duplicate,
+      );
+
+      _recomputeContentBounds();
+
+      final thresholdY = insertIndex * _basePageHeight;
+      final shiftDelta = Offset(0, _basePageHeight);
+      widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
+
+      if (atIndex == null) {
+        _transformationController.setOffset(
+          Offset(_transformationController.offset.dx, -thresholdY),
+          viewportSize,
+          _pageWidth,
+          _pageHeight,
+        );
+      }
+    });
+
+    _recordHistory();
+    _updateThumbnailCache(index + 1);
   }
   
   void _deletePage(Size viewportSize, {int? atIndex}) {
@@ -582,72 +524,25 @@ class CanvasViewState extends State<CanvasView> {
 
     setState(() {
       final deleteIndex = atIndex ?? _currentPageIndex;
-      _numPages--;
+      final pageToDelete = widget.pages.removeAt(deleteIndex);
 
-      widget.pageBackgrounds.removeAt(deleteIndex);
+      _recomputeContentBounds();
 
       final pageStartY = deleteIndex * _basePageHeight;
       final pageEndY = (deleteIndex + 1) * _basePageHeight;
       final shiftDelta = Offset(0, -_basePageHeight);
 
-      // Remove content in the deleted page and shift content below it
-      widget.bottomLayerStrokes.removeWhere((stroke) {
-        final centerY = stroke.getBounds().center.dy;
-        return centerY >= pageStartY && centerY < pageEndY;
-      });
-      for (int i = 0; i < widget.bottomLayerStrokes.length; i++) {
-        final stroke = widget.bottomLayerStrokes[i];
-        if (stroke.getBounds().top >= pageEndY - 1.0) {
-          widget.bottomLayerStrokes[i] = stroke.translate(shiftDelta);
-        }
-      }
-
-      widget.images.removeWhere((img) {
-        final centerY = img.getBounds().center.dy;
-        return centerY >= pageStartY && centerY < pageEndY;
-      });
-      for (int i = 0; i < widget.images.length; i++) {
-        final img = widget.images[i];
-        if (img.position.dy >= pageEndY - 1.0) {
-          widget.images[i] = img.translate(shiftDelta);
-        }
-      }
-
-      widget.texts.removeWhere((txt) {
-        final centerY = txt.getBounds().center.dy;
-        return centerY >= pageStartY && centerY < pageEndY;
-      });
-      for (int i = 0; i < widget.texts.length; i++) {
-        final txt = widget.texts[i];
-        if (txt.position.dy >= pageEndY - 1.0) {
-          widget.texts[i] = txt.translate(shiftDelta);
-        }
-      }
-
       widget.topCanvasKey.currentState?.deletePageContent(pageStartY, pageEndY, shiftDelta);
 
-      _recomputeContentBounds();
-      _pageHeight = _basePageHeight * _numPages;
-
-      // Update thumbnail cache
-      _thumbnailCache.remove(deleteIndex);
-      final Map<int, ui.Image> updatedCache = {};
-      _thumbnailCache.forEach((pageIdx, image) {
-        if (pageIdx > deleteIndex) {
-          updatedCache[pageIdx - 1] = image;
-        } else {
-          updatedCache[pageIdx] = image;
-        }
-      });
-      _thumbnailCache.clear();
-      _thumbnailCache.addAll(updatedCache);
+      // Update thumbnail cache by ID
+      final img = _thumbnailCache.remove(pageToDelete.id);
+      img?.dispose();
 
       if (_currentPageIndex >= _numPages) {
         _currentPageIndex = _numPages - 1;
       }
     });
 
-    widget.bottomCanvasKey.currentState?.update();
     _recordHistory();
   }
 
@@ -656,12 +551,11 @@ class CanvasViewState extends State<CanvasView> {
     if (targetIndex < 0 || targetIndex >= _numPages) return;
 
     setState(() {
-      // 1. Swap backgrounds
-      final tempBg = widget.pageBackgrounds[index];
-      widget.pageBackgrounds[index] = widget.pageBackgrounds[targetIndex];
-      widget.pageBackgrounds[targetIndex] = tempBg;
+      // 1. Swap pages
+      final tempPage = widget.pages[index];
+      widget.pages[index] = widget.pages[targetIndex];
+      widget.pages[targetIndex] = tempPage;
 
-      // Shift bottomLayerStrokes, images & texts
       final pageStartY = index * _basePageHeight;
       final pageEndY = (index + 1) * _basePageHeight;
       final targetStartY = targetIndex * _basePageHeight;
@@ -670,53 +564,16 @@ class CanvasViewState extends State<CanvasView> {
       final shiftDown = Offset(0, (targetIndex - index) * _basePageHeight);
       final shiftUp = Offset(0, (index - targetIndex) * _basePageHeight);
 
-      for (int i = 0; i < widget.bottomLayerStrokes.length; i++) {
-        final stroke = widget.bottomLayerStrokes[i];
-        final centerY = stroke.getBounds().center.dy;
-        if (centerY >= pageStartY && centerY < pageEndY) {
-          widget.bottomLayerStrokes[i] = stroke.translate(shiftDown);
-        } else if (centerY >= targetStartY && centerY < targetEndY) {
-          widget.bottomLayerStrokes[i] = stroke.translate(shiftUp);
-        }
-      }
-
-      for (int i = 0; i < widget.images.length; i++) {
-        final img = widget.images[i];
-        final centerY = img.getBounds().center.dy;
-        if (centerY >= pageStartY && centerY < pageEndY) {
-          widget.images[i] = img.translate(shiftDown);
-        } else if (centerY >= targetStartY && centerY < targetEndY) {
-          widget.images[i] = img.translate(shiftUp);
-        }
-      }
-
-      for (int i = 0; i < widget.texts.length; i++) {
-        final txt = widget.texts[i];
-        final centerY = txt.getBounds().center.dy;
-        if (centerY >= pageStartY && centerY < pageEndY) {
-          widget.texts[i] = txt.translate(shiftDown);
-        } else if (centerY >= targetStartY && centerY < targetEndY) {
-          widget.texts[i] = txt.translate(shiftUp);
-        }
-      }
-
-      _recomputeContentBounds();
-      
       widget.topCanvasKey.currentState?.movePageContent(
         pageStartY, pageEndY, shiftDown,
         targetStartY, targetEndY, shiftUp,
       );
 
-      // 2. SWAP cached thumbnails
-      final tempImage = _thumbnailCache[index];
-      _thumbnailCache[index] = _thumbnailCache[targetIndex]!;
-      _thumbnailCache[targetIndex] = tempImage!;
+      // Thumbnail cache remains valid for existing pages since it's ID-based.
 
-      widget.bottomCanvasKey.currentState?.update();
       _recordHistory();
     });
 
-    // 3. Re-rasterize swapped pages asynchronously to update translated coordinates
     _updateThumbnailCache(index);
     _updateThumbnailCache(targetIndex);
   }
@@ -742,111 +599,113 @@ class CanvasViewState extends State<CanvasView> {
   void _eraseFromBottom(Offset position) {
     bool changed = false;
     final double threshold = (widget.topCanvasKey.currentState?.penSize ?? 1.0) * 2.0;
+    final int pageIdx = (position.dy / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+    final page = widget.pages[pageIdx];
+    final relativePos = position - Offset(0, pageIdx * _basePageHeight);
 
     setState(() {
-      widget.bottomLayerStrokes.removeWhere((stroke) {
-        bool hit = stroke.points.any((p) => (p - position).distance < threshold);
-        if (hit) changed = true;
-        return hit;
-      });
+      final initialStrokeCount = page.strokes.length;
+      page.strokes.removeWhere((stroke) => stroke.points.any((p) => (p - relativePos).distance < threshold));
+      if (page.strokes.length != initialStrokeCount) changed = true;
 
-      widget.images.removeWhere((img) {
-        bool hit = img.getBounds().contains(position);
-        if (hit) changed = true;
-        return hit;
-      });
+      final initialImageCount = page.images.length;
+      page.images.removeWhere((img) => img.getBounds().contains(relativePos));
+      if (page.images.length != initialImageCount) changed = true;
       
-      widget.texts.removeWhere((txt) {
-        bool hit = txt.getBounds().contains(position);
-        if (hit) changed = true;
-        return hit;
-      });
+      final initialTextCount = page.texts.length;
+      page.texts.removeWhere((txt) => txt.getBounds().contains(relativePos));
+      if (page.texts.length != initialTextCount) changed = true;
     });
 
     if (changed) {
-      _recomputeContentBounds();
-      widget.bottomCanvasKey.currentState?.update();
-      widget.onCommit([], [], []);
       _recordHistory();
+      _updateThumbnailCache(pageIdx);
     }
   }
 
   List<Stroke> _selectFromBottom(Path lassoPath) {
     final List<Stroke> selected = [];
-    final List<Stroke> remaining = [];
-
-    for (final stroke in widget.bottomLayerStrokes) {
-      bool isInside = stroke.points.any((p) => lassoPath.contains(p));
-      if (isInside) {
-        selected.add(stroke);
-      } else {
-        remaining.add(stroke);
+    // For lasso, we might need to check multiple pages if the lasso spans them.
+    // For simplicity, we check all pages.
+    for (int i = 0; i < widget.pages.length; i++) {
+      final page = widget.pages[i];
+      final List<Stroke> remaining = [];
+      final pageOffset = Offset(0, i * _basePageHeight);
+      
+      for (final stroke in page.strokes) {
+        // Translate stroke to global for lasso check
+        final globalStroke = stroke.translate(pageOffset);
+        if (globalStroke.points.any((p) => lassoPath.contains(p))) {
+          selected.add(globalStroke);
+        } else {
+          remaining.add(stroke);
+        }
+      }
+      if (remaining.length != page.strokes.length) {
+        setState(() {
+          page.strokes.clear();
+          page.strokes.addAll(remaining);
+        });
+        _updateThumbnailCache(i);
       }
     }
-
-    if (selected.isNotEmpty) {
-      setState(() {
-        widget.bottomLayerStrokes.clear();
-        widget.bottomLayerStrokes.addAll(remaining);
-        _recomputeContentBounds();
-      });
-      widget.bottomCanvasKey.currentState?.update();
-      widget.onCommit([], [], []);
-    }
+    if (selected.isNotEmpty) _recordHistory();
     return selected;
   }
 
   List<ImageData> _selectImagesFromBottom(Path lassoPath) {
     final List<ImageData> selected = [];
-    final List<ImageData> remaining = [];
-
-    for (final img in widget.images) {
-      final bounds = img.getBounds();
-      if (lassoPath.contains(bounds.center) ||
-          lassoPath.contains(bounds.topLeft) ||
-          lassoPath.contains(bounds.bottomRight)) {
-        selected.add(img);
-      } else {
-        remaining.add(img);
+    for (int i = 0; i < widget.pages.length; i++) {
+      final page = widget.pages[i];
+      final List<ImageData> remaining = [];
+      final pageOffset = Offset(0, i * _basePageHeight);
+      
+      for (final img in page.images) {
+        final globalImg = img.translate(pageOffset);
+        final bounds = globalImg.getBounds();
+        if (lassoPath.contains(bounds.center)) {
+          selected.add(globalImg);
+        } else {
+          remaining.add(img);
+        }
+      }
+      if (remaining.length != page.images.length) {
+        setState(() {
+          page.images.clear();
+          page.images.addAll(remaining);
+        });
+        _updateThumbnailCache(i);
       }
     }
-
-    if (selected.isNotEmpty) {
-      setState(() {
-        widget.images.clear();
-        widget.images.addAll(remaining);
-        _recomputeContentBounds();
-      });
-      widget.bottomCanvasKey.currentState?.update();
-      widget.onCommit([], [], []);
-    }
+    if (selected.isNotEmpty) _recordHistory();
     return selected;
   }
   
   List<TextData> _selectTextsFromBottom(Path lassoPath) {
     final List<TextData> selected = [];
-    final List<TextData> remaining = [];
-
-    for (final txt in widget.texts) {
-      final bounds = txt.getBounds();
-      if (lassoPath.contains(bounds.center) ||
-          lassoPath.contains(bounds.topLeft) ||
-          lassoPath.contains(bounds.bottomRight)) {
-        selected.add(txt);
-      } else {
-        remaining.add(txt);
+    for (int i = 0; i < widget.pages.length; i++) {
+      final page = widget.pages[i];
+      final List<TextData> remaining = [];
+      final pageOffset = Offset(0, i * _basePageHeight);
+      
+      for (final txt in page.texts) {
+        final globalTxt = txt.translate(pageOffset);
+        final bounds = globalTxt.getBounds();
+        if (lassoPath.contains(bounds.center)) {
+          selected.add(globalTxt);
+        } else {
+          remaining.add(txt);
+        }
+      }
+      if (remaining.length != page.texts.length) {
+        setState(() {
+          page.texts.clear();
+          page.texts.addAll(remaining);
+        });
+        _updateThumbnailCache(i);
       }
     }
-
-    if (selected.isNotEmpty) {
-      setState(() {
-        widget.texts.clear();
-        widget.texts.addAll(remaining);
-        _recomputeContentBounds();
-      });
-      widget.bottomCanvasKey.currentState?.update();
-      widget.onCommit([], [], []);
-    }
+    if (selected.isNotEmpty) _recordHistory();
     return selected;
   }
 
@@ -905,6 +764,8 @@ class CanvasViewState extends State<CanvasView> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
@@ -920,6 +781,16 @@ class CanvasViewState extends State<CanvasView> {
         final safeWidth = constraints.maxWidth;
         final safeHeight = constraints.maxHeight;
         final viewportSize = Size(safeWidth, safeHeight);
+
+        if (_basePageHeight <= 0) {
+           _basePageHeight = safeHeight;
+           _pageWidth = _basePageHeight * .707;
+           _pageHeight = _basePageHeight * widget.pages.length;
+           _transformationController.initialize(
+              pageWidth: _pageWidth,
+              viewportWidth: safeWidth,
+           );
+        }
 
         return SizedBox(
           width: safeWidth,
@@ -978,50 +849,64 @@ class CanvasViewState extends State<CanvasView> {
                             child: child,
                           );
                         },
-                        child: SizedBox(
+                                child: SizedBox(
                           width: _pageWidth,
                           height: _pageHeight,
-                          child: ClipRect(
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                CanvasBackground(
-                                  numPages: _numPages,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Positioned.fill(
+                                child: CanvasBackground(
+                                  pages: widget.pages,
                                   pageWidth: _pageWidth,
                                   basePageHeight: _basePageHeight,
                                   paperType: widget.paperType,
-                                  pageBackgrounds: widget.pageBackgrounds,
                                   resolvePageBackground: widget.resolvePageBackground,
                                   currentPage: _currentPageIndex,
-                                  windowRadius: 1,
                                 ),
-                                ...widget.images.map((img) => Positioned(
-                                  left: img.position.dx,
-                                  top: img.position.dy,
-                                  child: Image.file(
-                                    File(img.imagePath),
-                                    width: img.width,
-                                    height: img.height,
-                                    fit: BoxFit.contain,
-                                  ),
-                                )),
-                                ...widget.texts.map((txt) => Positioned(
-                                  left: txt.position.dx,
-                                  top: txt.position.dy,
-                                  width: txt.width,
-                                  height: txt.height,
-                                  child: Text(
-                                    txt.text,
-                                    style: TextStyle(
-                                      fontSize: txt.fontSize,
-                                      color: txt.color,
+                              ),
+                              ...List.generate(widget.pages.length, (i) {
+                                if ((i - _currentPageIndex).abs() > 1) {
+                                  return Positioned(
+                                    top: i * _basePageHeight,
+                                    child: SizedBox(width: _pageWidth, height: _basePageHeight),
+                                  );
+                                }
+                                final page = widget.pages[i];
+                                return Positioned(
+                                  top: i * _basePageHeight,
+                                  child: Container(
+                                    width: _pageWidth,
+                                    height: _basePageHeight,
+                                    color: Colors.transparent, // Important: let background show through
+                                    child: Stack(
+                                      children: [
+                                        ...page.images.map((img) => Positioned(
+                                          left: img.position.dx,
+                                          top: img.position.dy,
+                                          child: Image.file(
+                                            File(img.imagePath),
+                                            width: img.width,
+                                            height: img.height,
+                                            fit: BoxFit.contain,
+                                          ),
+                                        )),
+                                        ...page.texts.map((txt) => Positioned(
+                                          left: txt.position.dx,
+                                          top: txt.position.dy,
+                                          width: txt.width,
+                                          height: txt.height,
+                                          child: Text(
+                                            txt.text,
+                                            style: TextStyle(fontSize: txt.fontSize, color: txt.color),
+                                          ),
+                                        )),
+                                        BottomCanvas(strokes: page.strokes),
+                                      ],
                                     ),
                                   ),
-                                )),
-                                BottomCanvas(
-                                  key: widget.bottomCanvasKey,
-                                  strokes: widget.bottomLayerStrokes,
-                                ),
+                                );
+                              }),
                                 DecoratedBox(
                                   decoration: BoxDecoration(
                                     border: Border.all(
@@ -1032,15 +917,21 @@ class CanvasViewState extends State<CanvasView> {
                                   child: TopCanvas(
                                     key: widget.topCanvasKey,
                                     onCommit: (strokes, images, texts) {
+                                      if (_basePageHeight <= 0) return;
                                       for (final s in strokes) {
-                                        _updateContentBoundsWithStroke(s);
+                                        final centerY = s.getBounds().center.dy;
+                                        final idx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+                                        widget.pages[idx].strokes.add(s.translate(Offset(0, -idx * _basePageHeight)));
                                       }
                                       for (final img in images) {
-                                        _updateContentBoundsWithImage(img);
+                                        final centerY = img.getBounds().center.dy;
+                                        final idx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+                                        widget.pages[idx].images.add(img.translate(Offset(0, -idx * _basePageHeight)));
                                       }
                                       for (final txt in texts) {
-                                        final b = txt.getBounds();
-                                        if (b.bottom > _maxContentY) _maxContentY = b.bottom;
+                                        final centerY = txt.getBounds().center.dy;
+                                        final idx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+                                        widget.pages[idx].texts.add(txt.translate(Offset(0, -idx * _basePageHeight)));
                                       }
                                       widget.onCommit(strokes, images, texts);
                                       _recordHistory();
@@ -1062,7 +953,7 @@ class CanvasViewState extends State<CanvasView> {
                           ),
                         ),
                       ),
-                    ),
+
                     Positioned(
                       top: 15,
                       left: 10,
@@ -1071,9 +962,10 @@ class CanvasViewState extends State<CanvasView> {
                         30.0,
                         90,
                         "back",
-                            () async {
+                            () {
                           // Just trigger a pop request. PopScope in HandwrittenNotePage will handle saving if needed.
-                          Navigator.of(context).pop();
+
+                              widget.onBack?.call();
                         },
                         context,
                         MediaQuery.of(context).size.width,
@@ -1137,7 +1029,7 @@ class CanvasViewState extends State<CanvasView> {
                         child: left_button_array(
                           context,
                           selectedTool: _selectedTool,
-                          currentSize: widget.topCanvasKey.currentState?.penSize ?? 3.0,
+                          currentSize: widget.topCanvasKey.currentState?.penSize ?? 1.0,
                           onIncrementSize: () => widget.topCanvasKey.currentState?.changeSize(0.5),
                           onDecrementSize: () => widget.topCanvasKey.currentState?.changeSize(-0.5),
                           onSizeDelta: (delta) => widget.topCanvasKey.currentState?.changeSize(delta),
@@ -1164,7 +1056,7 @@ class CanvasViewState extends State<CanvasView> {
                         : const SizedBox.shrink(),
                     if (_showColorPicker)
                       Padding(
-                        padding: EdgeInsetsGeometry.only(left: 80),
+                        padding: const EdgeInsets.only(left: 80),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: TapRegion(
@@ -1181,7 +1073,7 @@ class CanvasViewState extends State<CanvasView> {
                               onDismiss: () => setState(() => _showColorPicker = false),
                             ),
                           ),
-                        )
+                        ),
                       ),
                     CanvasScrollbar(
                       transformationController: _transformationController,
@@ -1203,6 +1095,7 @@ class CanvasViewState extends State<CanvasView> {
                           numPages: _numPages,
                           onMovePage: _movePage,
                           onAddPageBelow: (index) => _addPage(viewportSize, atIndex: index),
+                          onDuplicatePage: (index) => _duplicatePage(viewportSize, atIndex: index),
                           onDeletePage: (index) => _deletePage(viewportSize, atIndex: index),
                           onPageTap: _scrollToPage,
                           onClose: () => setState(() => _showPageManager = false),
@@ -1231,8 +1124,7 @@ class CanvasViewState extends State<CanvasView> {
                 ),
               ),
             ),
-          ),
-        );
+          ));
       },
     );
   }

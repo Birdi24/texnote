@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,20 +11,84 @@ import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdfx/pdfx.dart' as px;
+import 'dart:math';
 import './stroke.dart';
 import '../app_style.dart';
 import 'Note.dart';
 import './ImageData.dart';
 import './TextData.dart';
 
+enum PageSourceType { pdf, blank, duplicate }
+
+class PageSource {
+  final PageSourceType type;
+  final int? originalIndex; // 1-based index from source PDF
+
+  PageSource({required this.type, this.originalIndex});
+
+  Map<String, dynamic> toMap() => {
+    'type': type.name,
+    'originalIndex': originalIndex,
+  };
+
+  factory PageSource.fromMap(Map<String, dynamic> map) {
+    return PageSource(
+      type: PageSourceType.values.byName(map['type'] as String),
+      originalIndex: map['originalIndex'] as int?,
+    );
+  }
+
+  factory PageSource.pdf(int index) => PageSource(type: PageSourceType.pdf, originalIndex: index);
+  factory PageSource.blank() => PageSource(type: PageSourceType.blank);
+  factory PageSource.duplicate() => PageSource(type: PageSourceType.duplicate);
+}
+
+class NotePage {
+  final String id;
+  List<Stroke> strokes;
+  List<ImageData> images;
+  List<TextData> texts;
+  String? background;
+  PageSource source;
+
+  NotePage({
+    String? id,
+    List<Stroke>? strokes,
+    List<ImageData>? images,
+    List<TextData>? texts,
+    this.background,
+    required this.source,
+  })  : id = id ?? "${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(10000)}",
+        strokes = strokes ?? [],
+        images = images ?? [],
+        texts = texts ?? [];
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'strokes': strokes.map((s) => s.toMap()).toList(),
+    'images': images.map((i) => i.toMap()).toList(),
+    'texts': texts.map((t) => t.toMap()).toList(),
+    'background': background,
+    'source': source.toMap(),
+  };
+
+  factory NotePage.fromMap(Map<String, dynamic> map) {
+    return NotePage(
+      id: map['id'] as String?,
+      strokes: (map['strokes'] as List?)?.map((s) => Stroke.fromMap(s as Map<String, dynamic>)).toList(),
+      images: (map['images'] as List?)?.map((i) => ImageData.fromMap(i as Map<String, dynamic>)).toList(),
+      texts: (map['texts'] as List?)?.map((t) => TextData.fromMap(t as Map<String, dynamic>)).toList(),
+      background: map['background'] as String?,
+      source: PageSource.fromMap(map['source'] as Map<String, dynamic>),
+    );
+  }
+}
+
 class HandwrittenNote extends Note {
-  String cover ="1";
+  String cover = "1";
   String paperType = "blank";
-  List<Stroke> strokes = [];
-  List<String?> pageBackgrounds = [];
+  List<NotePage> pages = [];
   String pdfSourcePath;
-  List<ImageData> images = [];
-  List<TextData> texts = [];
 
   HandwrittenNote({
     required super.title,
@@ -32,36 +97,17 @@ class HandwrittenNote extends Note {
     required super.type,
     this.paperType = "blank",
     super.isFavorite = false,
-    List<String?> pageBackgrounds = const [],
+    List<NotePage>? pages,
     this.pdfSourcePath = "",
-    List<ImageData> images = const [],
-    List<TextData> texts = const [],
-  })  : pageBackgrounds = List<String?>.from(pageBackgrounds),
-        images = List<ImageData>.from(images),
-        texts = List<TextData>.from(texts);
-
+  }) : pages = pages ?? [NotePage(source: PageSource.blank())];
 
   /// json representation of the note
   String get_json() {
-    // Sanitize page backgrounds to remove brittle absolute paths
-    final sanitizedBackgrounds = pageBackgrounds.map((bg) {
-      if (bg == null || bg == "blank" || bg.startsWith("pdf_page:")) {
-        return bg;
-      }
-      // If it's an absolute path, we should have converted it to pdf_page:N 
-      // in _resolvePageBackground already. If not, it's safer to save as null 
-      // and let the sequence-based fallback handle it on next load.
-      return null;
-    }).toList();
-
     return jsonEncode({
-      'strokes': strokes.map((s) => s.toMap()).toList(),
+      'pages': pages.map((p) => p.toMap()).toList(),
       'cover': cover,
       'paperType': paperType,
-      'pageBackgrounds': sanitizedBackgrounds,
       'pdfSourcePath': pdfSourcePath,
-      'images': images.map((i) => i.toMap()).toList(),
-      'texts': texts.map((t) => t.toMap()).toList(),
     });
   }
 
@@ -73,20 +119,18 @@ class HandwrittenNote extends Note {
     if (await file.exists()) {
       final content = await file.readAsString();
       final finalTime = await file.lastModified();
-      
-      // Removed 'compute' to eliminate isolate-related hangs during troubleshooting
+
       final note = _parseNoteData({
         'content': content,
         'path': path,
         'finalTime': finalTime,
       });
-      
-      debugPrint("HandwrittenNote.load(): Loaded '${note.title}' with ${note.strokes.length} strokes");
+
+      debugPrint("HandwrittenNote.load(): Loaded '${note.title}' with ${note.pages.length} pages");
       return note;
     }
     throw Exception("File does not exist at $path");
   }
-
 
   static HandwrittenNote _parseNoteData(Map<String, dynamic> params) {
     final content = params['content'] as String;
@@ -97,47 +141,88 @@ class HandwrittenNote extends Note {
     final title = p.basenameWithoutExtension(path);
 
     final note = HandwrittenNote(
-        title: title,
-        path: path,
-        date: finalTime,
-        type: NoteType.HandwrittenNote,
-        paperType: data['paperType'] ?? "blank",
-        pageBackgrounds: (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e?.toString()).toList() ?? [],
-        pdfSourcePath: data['pdfSourcePath'] ?? "",
-        images: (data['images'] as List<dynamic>?)?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? [],
-        texts: (data['texts'] as List<dynamic>?)?.map((e) => TextData.fromMap(e as Map<String, dynamic>)).toList() ?? []
+      title: title,
+      path: path,
+      date: finalTime,
+      type: NoteType.HandwrittenNote,
+      paperType: data['paperType'] ?? "blank",
+      pdfSourcePath: data['pdfSourcePath'] ?? "",
     );
-    if (data['strokes'] != null) {
-      note.strokes = (data['strokes'] as List)
-          .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+
+    if (data['pages'] != null) {
+      note.pages = (data['pages'] as List)
+          .map((p) => NotePage.fromMap(p as Map<String, dynamic>))
           .toList();
-    }
-    
-    // Ensure pageBackgrounds is never empty and covers all strokes/images/texts
-    double maxY = 0;
-    for (final stroke in note.strokes) {
-      final b = stroke.getBounds();
-      if (b.bottom > maxY) maxY = b.bottom;
-    }
-    for (final img in note.images) {
-      final b = img.getBounds();
-      if (b.bottom > maxY) maxY = b.bottom;
-    }
-    for (final txt in note.texts) {
-      final b = txt.getBounds();
-      if (b.bottom > maxY) maxY = b.bottom;
-    }
-    
-    // Use 1188.0 as a default logical page height to match the UI's _pageSize
-    int requiredPages = (maxY / 1188.0).ceil();
-    if (requiredPages > note.pageBackgrounds.length) {
-      while (note.pageBackgrounds.length < requiredPages) {
-        note.pageBackgrounds.add(null);
+    } else {
+      // MIGRATION: Old flat format
+      debugPrint("Migrating legacy flat HandwrittenNote: $title");
+      
+      const double logicalPageHeight = 1188.0;
+      final List<String?> pageBackgrounds = (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e?.toString()).toList() ?? [];
+      final List<Stroke> strokes = (data['strokes'] as List?)
+          ?.map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+          .toList() ?? [];
+      final List<ImageData> images = (data['images'] as List?)
+          ?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? [];
+      final List<TextData> texts = (data['texts'] as List?)
+          ?.map((e) => TextData.fromMap(e as Map<String, dynamic>)).toList() ?? [];
+
+      int numPages = pageBackgrounds.length;
+      if (numPages == 0) {
+        double maxY = 0;
+        for (final s in strokes) {
+          final b = s.getBounds();
+          if (b.bottom > maxY) maxY = b.bottom;
+        }
+        numPages = (maxY / logicalPageHeight).ceil();
+        if (numPages == 0) numPages = 1;
       }
-    }
-    
-    if (note.pageBackgrounds.isEmpty) {
-      note.pageBackgrounds.add(null);
+
+      note.pages = List.generate(numPages, (i) {
+        final pageStartY = i * logicalPageHeight;
+        final pageEndY = (i + 1) * logicalPageHeight;
+        
+        String? bg = pageBackgrounds.length > i ? pageBackgrounds[i] : null;
+        PageSource source;
+        if (bg != null && bg.startsWith("pdf_page:")) {
+          source = PageSource.pdf(int.parse(bg.split(":").last));
+        } else if (bg != null && bg.contains("page_")) {
+          // Try to recover page number from legacy absolute path
+          final match = RegExp(r'page_(\d+)').firstMatch(bg);
+          if (match != null) {
+            int pageNum = int.parse(match.group(1)!);
+            source = PageSource.pdf(pageNum);
+            bg = "pdf_page:$pageNum"; // Convert back to marker to force new cache usage
+          } else {
+            source = PageSource.blank();
+          }
+        } else {
+          source = PageSource.blank();
+        }
+
+        final pageStrokes = strokes.where((s) {
+          final centerY = s.getBounds().center.dy;
+          return centerY >= pageStartY && centerY < pageEndY;
+        }).map((s) => s.translate(Offset(0, -pageStartY))).toList();
+
+        final pageImages = images.where((img) {
+          final centerY = img.getBounds().center.dy;
+          return centerY >= pageStartY && centerY < pageEndY;
+        }).map((img) => img.translate(Offset(0, -pageStartY))).toList();
+
+        final pageTexts = texts.where((txt) {
+          final centerY = txt.getBounds().center.dy;
+          return centerY >= pageStartY && centerY < pageEndY;
+        }).map((txt) => txt.translate(Offset(0, -pageStartY))).toList();
+
+        return NotePage(
+          strokes: pageStrokes,
+          images: pageImages,
+          texts: pageTexts,
+          background: bg,
+          source: source,
+        );
+      });
     }
 
     note.cover = data['cover'] ?? "1";
@@ -312,25 +397,30 @@ class HandwrittenNote extends Note {
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
       await file.writeAsString(get_json());
+
+      List<NotePage> duplicatedPages = pages.map((page) => NotePage(
+        id: "${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(10000)}",
+        strokes: page.strokes.map((s) => s.copy()).toList(),
+        images: page.images.map((i) => i.copy()).toList(),
+        texts: page.texts.map((t) => t.copy()).toList(),
+        background: page.background,
+        source: PageSource(type: page.source.type, originalIndex: page.source.originalIndex),
+      )).toList();
+
       HandwrittenNote dup = HandwrittenNote(
-          title: "$title-Copy",
-          date: DateTime.now(),
-          path: newPath,
-          type: type,
-          paperType: paperType,
-          pageBackgrounds: List.from(pageBackgrounds),
-          pdfSourcePath: pdfSourcePath,
-          images: images.map((i) => i.copy()).toList(),
-          texts: texts.map((t) => t.copy()).toList(),
+        title: "$title-Copy",
+        date: DateTime.now(),
+        path: newPath,
+        type: type,
+        paperType: paperType,
+        pages: duplicatedPages,
+        pdfSourcePath: pdfSourcePath,
       );
-      dup.strokes = strokes.map((s) => s.copy()).toList();
       dup.cover = cover;
       return dup;
-
-    }
-    catch (e) {
+    } catch (e) {
       debugPrint("Error duplicating note: $e");
-      return HandwrittenNote(title: "INVALID", type: type, date: date,path: path);
+      return HandwrittenNote(title: "INVALID", type: type, date: date, path: path);
     }
   }
 
@@ -421,20 +511,9 @@ class HandwrittenNote extends Note {
     px.PdfDocument? bgPdf;
     try {
       final pdf = pw.Document();
-      
+
       const double logicalPageHeight = 1188.0;
       const double logicalPageWidth = 840.0;
-
-      int numPages = pageBackgrounds.length;
-      if (numPages == 0) {
-        double maxY = 0;
-        for (final stroke in strokes) {
-          final bounds = stroke.getBounds();
-          if (bounds.bottom > maxY) maxY = bounds.bottom;
-        }
-        numPages = (maxY / logicalPageHeight).ceil();
-        if (numPages == 0) numPages = 1;
-      }
 
       if (pdfSourcePath.isNotEmpty) {
         try {
@@ -444,11 +523,13 @@ class HandwrittenNote extends Note {
         }
       }
 
-      for (int i = 0; i < numPages; i++) {
+      for (var pageObj in pages) {
         // Pre-render background if it's a PDF page
         pw.MemoryImage? bgImage;
-        if (pageBackgrounds.length > i && pageBackgrounds[i] != null) {
-          final bg = pageBackgrounds[i]!;
+        final bg = pageObj.background;
+        PdfPageFormat pageFormat = PdfPageFormat.a4;
+
+        if (bg != null) {
           if (bg.startsWith("pdf_page:")) {
             if (bgPdf != null) {
               try {
@@ -460,17 +541,30 @@ class HandwrittenNote extends Note {
                   format: px.PdfPageImageFormat.jpeg,
                 );
                 if (img != null) bgImage = pw.MemoryImage(img.bytes);
+
+                // Match exported PDF page format to the source PDF page size
+                pageFormat = PdfPageFormat(page.width.toDouble(), page.height.toDouble());
                 await page.close();
               } catch (e) {
                 debugPrint("Error rendering PDF page for export: $e");
               }
             }
           } else if (bg != "blank") {
-            // Legacy/Absolute path
             try {
               final file = File(bg);
               if (await file.exists()) {
-                bgImage = pw.MemoryImage(await file.readAsBytes());
+                final bytes = await file.readAsBytes();
+                bgImage = pw.MemoryImage(bytes);
+                try {
+                  final codec = await ui.instantiateImageCodec(bytes);
+                  final frameInfo = await codec.getNextFrame();
+                  final decodedImage = frameInfo.image;
+                  pageFormat = PdfPageFormat(decodedImage.width.toDouble(), decodedImage.height.toDouble());
+                  decodedImage.dispose();
+                  codec.dispose();
+                } catch (e) {
+                  debugPrint("Error decoding image dimensions for export: $e");
+                }
               }
             } catch (e) {
               debugPrint("Error loading image background for export: $e");
@@ -478,9 +572,12 @@ class HandwrittenNote extends Note {
           }
         }
 
+        final scaleX = pageFormat.width / logicalPageWidth;
+        final scaleY = pageFormat.height / logicalPageHeight;
+
         pdf.addPage(
           pw.Page(
-            pageFormat: PdfPageFormat.a4,
+            pageFormat: pageFormat,
             build: (pw.Context context) {
               return pw.FullPage(
                 ignoreMargins: true,
@@ -491,23 +588,15 @@ class HandwrittenNote extends Note {
                       pw.Positioned.fill(
                         child: pw.Image(
                           bgImage,
-                          fit: pw.BoxFit.contain,
+                          fit: pw.BoxFit.fill,
                         ),
                       ),
-                    
+
                     // User-added Images
-                    ...images.where((img) {
-                      final startY = i * logicalPageHeight;
-                      final endY = (i + 1) * logicalPageHeight;
-                      // Simple check: if top of image is on this page
-                      return img.position.dy >= startY && img.position.dy < endY;
-                    }).map((img) {
-                      final startY = i * logicalPageHeight;
-                      final scaleX = PdfPageFormat.a4.width / logicalPageWidth;
-                      final scaleY = PdfPageFormat.a4.height / logicalPageHeight;
+                    ...pageObj.images.map((img) {
                       return pw.Positioned(
                         left: img.position.dx * scaleX,
-                        top: (img.position.dy - startY) * scaleY,
+                        top: img.position.dy * scaleY,
                         child: pw.Image(
                           pw.MemoryImage(File(img.imagePath).readAsBytesSync()),
                           width: img.width * scaleX,
@@ -515,19 +604,12 @@ class HandwrittenNote extends Note {
                         ),
                       );
                     }),
-                    
+
                     // User-added Texts
-                    ...texts.where((txt) {
-                      final startY = i * logicalPageHeight;
-                      final endY = (i + 1) * logicalPageHeight;
-                      return txt.position.dy >= startY && txt.position.dy < endY;
-                    }).map((txt) {
-                      final startY = i * logicalPageHeight;
-                      final scaleX = PdfPageFormat.a4.width / logicalPageWidth;
-                      final scaleY = PdfPageFormat.a4.height / logicalPageHeight;
+                    ...pageObj.texts.map((txt) {
                       return pw.Positioned(
                         left: txt.position.dx * scaleX,
-                        top: (txt.position.dy - startY) * scaleY,
+                        top: txt.position.dy * scaleY,
                         child: pw.SizedBox(
                           width: txt.width * scaleX,
                           height: txt.height * scaleY,
@@ -541,7 +623,7 @@ class HandwrittenNote extends Note {
                         ),
                       );
                     }),
-                    
+
                     // Paper Type & Strokes
                     pw.Positioned.fill(
                       child: pw.CustomPaint(
@@ -572,45 +654,39 @@ class HandwrittenNote extends Note {
                           }
 
                           // Strokes
-                          final scaleX = size.x / logicalPageWidth;
-                          final scaleY = size.y / logicalPageHeight;
+                          final strokeScaleX = size.x / logicalPageWidth;
+                          final strokeScaleY = size.y / logicalPageHeight;
 
-                          for (final stroke in strokes) {
-                            final bounds = stroke.getBounds();
-                            final startY = i * logicalPageHeight;
-                            final endY = (i + 1) * logicalPageHeight;
-
-                            if (bounds.bottom > startY && bounds.top < endY) {
-                              final freehandPoints = stroke.points.map((p) => PointVector(p.dx, p.dy, 0.5)).toList();
-                              final outline = getStroke(
-                                freehandPoints,
-                                options: StrokeOptions(
-                                  size: stroke.size,
-                                  thinning: 0.5,
-                                  smoothing: 0.5,
-                                  streamline: 0.5,
-                                  simulatePressure: false,
-                                  start: StrokeEndOptions.start(
-                                    cap: stroke.hasStartCap,
-                                    taperEnabled: false,
-                                  ),
-                                  end: StrokeEndOptions.end(
-                                    cap: stroke.hasEndCap,
-                                    taperEnabled: false,
-                                  ),
+                          for (final stroke in pageObj.strokes) {
+                            final freehandPoints = stroke.points.map((p) => PointVector(p.dx, p.dy, 0.5)).toList();
+                            final outline = getStroke(
+                              freehandPoints,
+                              options: StrokeOptions(
+                                size: stroke.size,
+                                thinning: 0.5,
+                                smoothing: 0.5,
+                                streamline: 0.5,
+                                simulatePressure: false,
+                                start: StrokeEndOptions.start(
+                                  cap: stroke.hasStartCap,
+                                  taperEnabled: false,
                                 ),
-                              );
+                                end: StrokeEndOptions.end(
+                                  cap: stroke.hasEndCap,
+                                  taperEnabled: false,
+                                ),
+                              ),
+                            );
 
-                              if (outline.isNotEmpty) {
-                                canvas.moveTo(outline.first.dx * scaleX, size.y - (outline.first.dy - startY) * scaleY);
-                                for (final p in outline.skip(1)) {
-                                  canvas.lineTo(p.dx * scaleX, size.y - (p.dy - startY) * scaleY);
-                                }
-                                canvas.closePath();
-                                final adaptiveColor = getAdaptiveStrokeColor(stroke.color, WHITE);
-                                canvas.setFillColor(PdfColor.fromInt(adaptiveColor.toARGB32()));
-                                canvas.fillPath();
+                            if (outline.isNotEmpty) {
+                              canvas.moveTo(outline.first.dx * strokeScaleX, size.y - outline.first.dy * strokeScaleY);
+                              for (final p in outline.skip(1)) {
+                                canvas.lineTo(p.dx * strokeScaleX, size.y - p.dy * strokeScaleY);
                               }
+                              canvas.closePath();
+                              final adaptiveColor = getAdaptiveStrokeColor(stroke.color, WHITE);
+                              canvas.setFillColor(PdfColor.fromInt(adaptiveColor.toARGB32()));
+                              canvas.fillPath();
                             }
                           }
                         },
@@ -643,4 +719,3 @@ class HandwrittenNote extends Note {
     }
   }
 }
-

@@ -127,7 +127,7 @@ Widget consolidated_tool_array(
 Widget left_button_array(
     context, {
       DrawingTool selectedTool = DrawingTool.pen,
-      double currentSize = 3.0,
+      double currentSize = 1.0,
       VoidCallback? onIncrementSize,
       VoidCallback? onDecrementSize,
       Function(double)? onSizeDelta,

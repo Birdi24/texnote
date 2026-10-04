@@ -9,6 +9,7 @@ class PageListView extends StatefulWidget {
   final int currentPage;
   final Function(int index, int direction) onMovePage;
   final Function(int index) onAddPageBelow;
+  final Function(int index) onDuplicatePage;
   final Function(int index) onDeletePage;
   final Function(int index) onPageTap;
   final VoidCallback onClose;
@@ -19,6 +20,7 @@ class PageListView extends StatefulWidget {
     required this.currentPage,
     required this.onMovePage,
     required this.onAddPageBelow,
+    required this.onDuplicatePage,
     required this.onDeletePage,
     required this.onPageTap,
     required this.onClose,
@@ -130,6 +132,11 @@ class _PageListViewState extends State<PageListView> {
                                   _CompactAction(
                                     icon: LucideIcons.file_plus, color: accent,
                                     onPressed: () => widget.onAddPageBelow(index),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _CompactAction(
+                                    icon: LucideIcons.copy, color: accent,
+                                    onPressed: () => widget.onDuplicatePage(index),
                                   ),
                                   const SizedBox(width: 4),
                                   _CompactAction(

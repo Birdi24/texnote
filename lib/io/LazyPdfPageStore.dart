@@ -1,23 +1,16 @@
 import 'dart:io';
-
 import 'package:path/path.dart' as p;
 import 'package:pdfx/pdfx.dart';
 
-/// Only rendering PDF pages near the current page,
+/// Only rendering PDF pages near the current page.
 class LazyPdfPageStore {
-  LazyPdfPageStore({
-    required this.pdfPath,
-    required this.noteDir,
-    this.renderRadius = 1, // pages actually rendered around current, aka +-1 from current page
-    this.diskKeepRadius = 2, // wider buffer before deleting rendered pages
-    this.maxDimension = 2400.0, // max dimension of rendered pages
-  });
-
   final String pdfPath;
   final Directory noteDir;
   final int renderRadius;
   final int diskKeepRadius;
   final double maxDimension;
+
+  late final Directory _cacheDir;
 
   PdfDocument? _document;
   Future<PdfDocument>? _openFuture;
@@ -28,8 +21,25 @@ class LazyPdfPageStore {
   /// duplicate concurrent rendering tasks for the same page.
   final Map<int, Future<String>> _activeTasks = {};
 
+  LazyPdfPageStore({
+    required this.pdfPath,
+    required this.noteDir,
+    this.renderRadius = 1, // pages actually rendered around current, aka +-1 from current page
+    this.diskKeepRadius = 2, // wider buffer before deleting rendered pages
+    this.maxDimension = 2400.0, // max dimension of rendered pages
+  }) {
+    // Create a unique cache directory for this specific PDF file
+    // to avoid collisions when multiple documents are open.
+    // Use a hash or unique identifier if possible, but basename + dirname hash is usually enough.
+    final String uniqueId = p.basenameWithoutExtension(pdfPath).replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+    _cacheDir = Directory(p.join(noteDir.path, '.pdf_cache', uniqueId));
+  }
+
   /// opens the pdf if it isn't already
   Future<void> _ensureOpen() async {
+    if (!await _cacheDir.exists()) {
+      await _cacheDir.create(recursive: true);
+    }
     if (_document != null) return;
     _openFuture ??= PdfDocument.openFile(pdfPath);
     _document = await _openFuture;
@@ -44,8 +54,8 @@ class LazyPdfPageStore {
     final cached = _renderedPaths[pageIndex];
     if (cached != null && await File(cached).exists()) return cached;
 
-    // 2. Disk check (e.g. after restart)
-    final diskPath = p.join(noteDir.path, 'page_$pageIndex.jpg');
+    // 2. Disk check
+    final diskPath = p.join(_cacheDir.path, 'page_$pageIndex.jpg');
     if (await File(diskPath).exists()) {
       _renderedPaths[pageIndex] = diskPath;
       return diskPath;
@@ -85,9 +95,11 @@ class LazyPdfPageStore {
         format: PdfPageImageFormat.jpeg,
       );
 
+      if (pageImage == null) throw Exception("Failed to render page $pageIndex");
+
       /// Save page locally
-      final path = p.join(noteDir.path, 'page_$pageIndex.jpg');
-      await File(path).writeAsBytes(pageImage!.bytes);
+      final path = p.join(_cacheDir.path, 'page_$pageIndex.jpg');
+      await File(path).writeAsBytes(pageImage.bytes);
 
       /// Cache the path for later
       _renderedPaths[pageIndex] = path;
@@ -131,7 +143,7 @@ class LazyPdfPageStore {
     for (final i in toRemove) {
       final path = _renderedPaths.remove(i);
       if (path != null) {
-        File(path).delete().catchError((_) {});
+        File(path).delete().catchError((_) => File(''));
       }
     }
   }

@@ -18,10 +18,11 @@ class TextNoteScreen extends StatefulWidget {
   State<TextNoteScreen> createState() => _TextNoteScreenState();
 }
 
-class _TextNoteScreenState extends State<TextNoteScreen> {
+class _TextNoteScreenState extends State<TextNoteScreen> with WidgetsBindingObserver {
   // Timer for auto-saving the note
   Timer? _autoSaveTimer;
   bool _isSaving = false;
+  bool _allowPop = false;
 
   // Controller for the title of the note
   var titleController = TextEditingController();
@@ -43,6 +44,7 @@ class _TextNoteScreenState extends State<TextNoteScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     titleController = TextEditingController(text: widget.note.title);
 
     Delta delta;
@@ -61,6 +63,13 @@ class _TextNoteScreenState extends State<TextNoteScreen> {
     old_title = widget.note.title;
     _autoSaveTimer = Timer.periodic( const Duration(minutes: 1), (_) => save(),);
 
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      save();
+    }
   }
 
   void _markChanged() {
@@ -115,6 +124,7 @@ class _TextNoteScreenState extends State<TextNoteScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     titleController.dispose();
     bodyController.dispose();
     _autoSaveTimer?.cancel();
@@ -124,15 +134,24 @@ class _TextNoteScreenState extends State<TextNoteScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !changed || _isSaving,
+      canPop: _allowPop,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
-        if (changed && !_isSaving) {
-          setState(() => _isSaving = true);
+        if (!_isSaving) {
+          _isSaving = true;
           debugPrint("TextNoteScreen: onPopInvoked - saving before pop");
-          await save();
+          try {
+            await save();
+          } catch (e) {
+            debugPrint("TextNoteScreen: error saving before pop: $e");
+          } finally {
+            _isSaving = false;
+          }
           if (mounted) {
+            setState(() {
+              _allowPop = true;
+            });
             debugPrint("TextNoteScreen: save completed, popping");
             Navigator.of(context).pop();
           }

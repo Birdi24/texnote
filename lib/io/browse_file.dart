@@ -74,7 +74,7 @@ Future<List<Note>> collect() async {
   debugPrint("collect(): found ${allEntities.length} entities in storage");
   
   final notePaths = allEntities
-      .where((e) => e.path.endsWith('.note'))
+      .where((e) => e.path.endsWith('.note') && !e.path.contains('flutter_assets') && !e.path.contains('fluttter_assets'))
       .map((e) => e.path)
       .toSet();
 
@@ -83,6 +83,7 @@ Future<List<Note>> collect() async {
     if (file is! File) return false;
     if (file.uri.pathSegments.last.startsWith('.')) return false;
     if (path.contains('${Platform.pathSeparator}pdf_imports${Platform.pathSeparator}')) return false;
+    if (path.contains('flutter_assets') || path.contains('fluttter_assets')) return false;
 
     if (path.endsWith('.txt') || path.endsWith('.note')) return true;
     

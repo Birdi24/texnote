@@ -107,7 +107,11 @@ class Folder {
       for (var entity in entities) {
         if (entity is Directory) {
           final relativePath = p.relative(entity.path, from: appDir.path);
-          if (relativePath.startsWith('.') || relativePath.contains('/.') || relativePath.startsWith('pdf_imports')) continue;
+          if (relativePath.startsWith('.') || 
+              relativePath.contains('/.') || 
+              relativePath.startsWith('pdf_imports') ||
+              relativePath.contains('flutter_assets') ||
+              relativePath.contains('fluttter_assets')) continue;
           if (relativePath == '.') continue;
 
           final String title = p.basename(entity.path);

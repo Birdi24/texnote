@@ -10,8 +10,6 @@ import '../io/browse_file.dart';
 import '../models/Note.dart';
 import '../models/TextNote.dart';
 import '../models/folder.dart';
-import '../screens/HandwrittenNoteScreen/main.dart';
-import '../screens/TextNoteScreen/main.dart';
 import 'glass_container.dart';
 
 void run_async(Function(String) await_f1, Function() f2) async {
@@ -19,7 +17,7 @@ void run_async(Function(String) await_f1, Function() f2) async {
   f2();
 }
 
-void new_file_options(BuildContext context, Future<void> Function([Note?]) onNoteCreated, List<Folder> folders, List<Note> notes, int control, dynamic addOrRemoveFavorite, Folder? selectedFolder) {
+void new_file_options(BuildContext context, Future<void> Function([Note?]) onNoteCreated, List<Folder> folders, List<Note> notes, int control, dynamic addOrRemoveFavorite, Folder? selectedFolder, Future<void> Function(BuildContext, Note) openNote) {
   double screenWidth = MediaQuery.of(context).size.width;
 
   showModalBottomSheet(
@@ -55,14 +53,10 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
                         date: DateTime.now(),
                       );
                       
-                      // Save and refresh in background to ensure Home Screen is ready on return
                       run_async(note.save, () => onNoteCreated(note));
                       
                       if (context.mounted) {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => TextNoteScreen(note)),
-                        );
+                        await openNote(context, note);
                       }
                     },
                   ),
@@ -71,7 +65,7 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
                     title: const Text('New Handwritten Note'),
                     onTap: () {
                       Navigator.pop(modalContext);
-                      on_new_handwritten_note(context, notes, onNoteCreated, control, addOrRemoveFavorite, selectedFolder);
+                      on_new_handwritten_note(context, notes, onNoteCreated, control, addOrRemoveFavorite, selectedFolder, openNote);
                     },
                   ),
                   ListTile(
@@ -89,7 +83,6 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
                       Navigator.pop(modalContext);
                       final note = await FileOpenerScreen().importPdf();
                       if (note != null && context.mounted) {
-                        // Move to current folder if needed
                         if (selectedFolder != null) {
                           await note.move_to(selectedFolder.path);
                         }
@@ -97,13 +90,9 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
                         if (control == 2) {
                           addOrRemoveFavorite(note);
                         }
-                        // Move and refresh in background
                         run_async((_) => note.save(""), () => onNoteCreated(note));
                         
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => HandwrittenNotePage(note: note)),
-                        );
+                        await openNote(context, note);
                       }
                     },
                   ),
@@ -119,10 +108,10 @@ void new_file_options(BuildContext context, Future<void> Function([Note?]) onNot
   );
 }
 
-Widget new_note_button(BuildContext context, Future<void> Function([Note?]) onNoteCreated, List<Folder> folders, List<Note> notes, int control, dynamic addOrRemoveFavorite, Folder? selectedFolder, bool selectionText) {
+Widget new_note_button(BuildContext context, Future<void> Function([Note?]) onNoteCreated, List<Folder> folders, List<Note> notes, int control, dynamic addOrRemoveFavorite, Folder? selectedFolder, bool selectionText, Future<void> Function(BuildContext, Note) openNote) {
   return GestureDetector(
     onTap: () {
-      new_file_options(context, onNoteCreated, folders, notes, control, addOrRemoveFavorite, selectedFolder);
+      new_file_options(context, onNoteCreated, folders, notes, control, addOrRemoveFavorite, selectedFolder, openNote);
     },
     child: glassContainer(
       width: 170,

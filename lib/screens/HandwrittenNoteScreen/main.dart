@@ -192,4 +192,3 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
     );
   }
 }
-

@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 import 'app_style.dart';
-import 'screens/HomeScreen/main.dart';
+import 'screens/HomeScreen/multi_tab_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +53,7 @@ class NotesApp extends StatelessWidget {
             Locale('en'),
           ],
 
-          home: HomeScreen(
+          home: MultiTabHomeScreen(
             themeManager: themeManager,
           ),
         );

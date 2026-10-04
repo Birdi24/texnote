@@ -5,7 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:birdwrite/models/HandwrittenNote.dart';
 import 'package:birdwrite/models/Note.dart';
 import 'package:birdwrite/models/folder.dart';
-import 'package:birdwrite/screens/HandwrittenNoteScreen/main.dart';
 import '../app_style.dart';
 import 'color_picker.dart';
 import 'glass_container.dart';
@@ -21,6 +20,7 @@ Future<void> on_new_handwritten_note(
   int control,
   dynamic addOrRemoveFavorite,
   Folder? selectedFolder,
+  Future<void> Function(BuildContext, Note) openNote,
 ) async {
   double screenWidth = MediaQuery.of(context).size.width;
   String selectedColor = "1";
@@ -131,14 +131,9 @@ Future<void> on_new_handwritten_note(
                               );
                               note.cover = selectedColor;
                               
-                              // Save immediately so it exists on disk before opening
                               run_async(note.save, () => onNoteCreated(note));
 
-                              
-                              await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(builder: (_) => HandwrittenNotePage(note: note)),
-                              );
+                              await openNote(context, note);
 
                               if (!context.mounted) return;
                               if (control == 2) {

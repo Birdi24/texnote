@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
+import '../../app_style.dart';
 import '../../models/Note.dart';
 import '../../models/folder.dart';
-import '../../models/TextNote.dart';
-import '../../models/HandwrittenNote.dart';
-import '../HandwrittenNoteScreen/main.dart';
 import '../../widgets/show_note_options.dart';
 import '../../widgets/show_folder_options.dart';
-import '../TextNoteScreen/main.dart';
 
 import 'nothing_view.dart';
 
@@ -23,6 +20,8 @@ Widget note_card({
   required void Function(Note) onNoteDeleted,
   required void Function(Note) onNoteAdded,
   required void Function(Note) addToFavorites,
+  required Future<void> Function(BuildContext, Note) openNote,
+  required Map<String, int> openNotes,
 }) {
 
   void showOptions() {
@@ -38,31 +37,46 @@ Widget note_card({
     );
   }
 
+  int? openTabIdx = openNotes[note.path];
+  Widget cardWidget = note.display();
+
+  if (openTabIdx != null) {
+    cardWidget = Stack(
+      children: [
+        cardWidget,
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: icon_color.withAlpha(220),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              "Tab ${openTabIdx + 1}",
+              style: TextStyle(
+                color: BG,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   return GestureDetector(
     onLongPress: showOptions,
     onDoubleTap: showOptions,
     onTap: () async {
       debugPrint("note_card.onTap: opening note ${note.title}");
-      if (note.type == NoteType.TextNote) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TextNoteScreen(note as TextNote),
-          ),
-        );
-      } else if (note.type == NoteType.HandwrittenNote) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => HandwrittenNotePage(note: note as HandwrittenNote),
-          ),
-        );
-      }
+      await openNote(context, note);
       debugPrint("note_card.onTap: returned from note screen. note: ${note.title}");
-      await onNoteChanged(); // Force full refresh for now to troubleshoot
+      await onNoteChanged();
     },
-
-    child: note.display(),
+    child: cardWidget,
   );
 }
 
@@ -176,6 +190,8 @@ Widget home_body({
   required Folder? selectedFolder,
   required bool inFolder,
   required List<Folder> allFolders,
+  required Future<void> Function(BuildContext, Note) openNote,
+  required Map<String, int> openNotes,
 }) {
   debugPrint("home_body.dart: control=$control, displayedNotesCount=${displayedNotes.length}, foldersCount=${folders.length}");
   if (displayedNotes.isNotEmpty) {
@@ -207,6 +223,8 @@ Widget home_body({
     onNoteDeleted: onNoteDeleted,
     onNoteAdded: onNoteAdded,
     addToFavorites: addToFavorites,
+    openNote: openNote,
+    openNotes: openNotes,
   )));
 
   if (gridChildren.isEmpty) {

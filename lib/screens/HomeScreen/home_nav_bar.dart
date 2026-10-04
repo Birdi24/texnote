@@ -10,7 +10,7 @@ import '../../widgets/single_circle_button.dart';
 
 /// This has 4 buttons: PDFs, Notes, Favorites, Add
 /// They are aligned bottom center
-Widget home_nav_bar(Future<void> Function([Note?]) onNoteChanged, context, screenWidth, control, onControlChanged, folders, notes, addOrRemoveFavorite, selectedFolder) {
+Widget home_nav_bar(Future<void> Function([Note?]) onNoteChanged, context, screenWidth, control, onControlChanged, folders, notes, addOrRemoveFavorite, selectedFolder, Future<void> Function(BuildContext, Note) openNote) {
   return Align(
     alignment: Alignment.bottomCenter,
     child: Padding(
@@ -38,7 +38,7 @@ Widget home_nav_bar(Future<void> Function([Note?]) onNoteChanged, context, scree
 
           single_circle_button(
             LucideIcons.plus, 34.0, 34, "Add",
-            () async { new_file_options(context, onNoteChanged, folders, notes, control, addOrRemoveFavorite, selectedFolder);},
+            () async { new_file_options(context, onNoteChanged, folders, notes, control, addOrRemoveFavorite, selectedFolder, openNote);},
             context, screenWidth, button_width: (screenWidth > 600) ? 64 : 60,
           ),
         ],

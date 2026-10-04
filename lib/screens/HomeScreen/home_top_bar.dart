@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,7 +45,7 @@ Widget top_left_cluster(int control, Folder? selectedFolder, VoidCallback closeF
   double rightClusterWidth = 15 + (showSearch ? 3 : 2) * 45 + (showSearch ? 2 : 1) * 8;
 
   return Positioned(
-    top: 16,
+    top: 6,
     left: 15,
     right: rightClusterWidth + 5,
     child: Align(
@@ -70,7 +71,7 @@ Widget top_left_cluster(int control, Folder? selectedFolder, VoidCallback closeF
   );
 }
 
-/// A gradient below the top of the Home Screen to give the illusion of the title floating
+/// A linear blur below the top of the Home Screen to give the illusion of the title floating
 Widget bg_gradient(){
   return Positioned(
     left: 0, right: 0, top: 20,
@@ -93,7 +94,7 @@ Widget bg_gradient(){
 /// Widget that houses the search, sort and themes button
 Widget top_right_button_cluster(int control, bool inFolder, Future<void> Function([Note?]) onNoteChanged, Function() onSortChanged, BuildContext context, double screenWidth, Function() onSearchChanged, bool isSearching, themeManager) {
   return Positioned(
-    top: 20,
+    top: 10,
     right: 15,
     child: Align(
       alignment: Alignment.topRight,

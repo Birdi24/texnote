@@ -11,7 +11,7 @@ import '../../widgets/title_label.dart';
 
 Widget note_top(context, changed, Future<void> Function() save,
     titleController, QuillController bodyController, double fontSize,
-    Function(double) onFontSizeChanged,){
+    Function(double) onFontSizeChanged, Future<void> Function() onBack){
 
   return Column(
     children: [
@@ -19,7 +19,7 @@ Widget note_top(context, changed, Future<void> Function() save,
       Row(
         children: [
           single_circle_button(LucideIcons.chevron_left, 30.0, 40, "back",
-                  () async {if (changed){ await save();}Navigator.pop(context,true);},
+                  onBack,
               context, MediaQuery.of(context).size.width,button_width: 50, bgAlpha: 160),
           const SizedBox(width: 10),
           Align(
@@ -63,4 +63,3 @@ Widget note_top(context, changed, Future<void> Function() save,
     ]
   );
 }
-

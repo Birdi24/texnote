@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:birdwrite/screens/HandwrittenNoteScreen/canvas_options.dart';
@@ -9,6 +11,8 @@ import 'lasso_manager.dart';
 import '../../models/ImageData.dart';
 import '../../models/TextData.dart';
 import '../../models/stroke.dart';
+
+enum ShapeType { line, rectangle }
 
 class TopCanvas extends StatefulWidget {
   final void Function(List<Stroke> strokes, List<ImageData> images, List<TextData> texts) onCommit;
@@ -46,6 +50,13 @@ class TopCanvasState extends State<TopCanvas> {
   final LassoManager _lassoManager = LassoManager();
   Offset? _lastPointerPos;
 
+  Timer? _lineSnapTimer;
+  Timer? _shapeSnapTimer;
+  bool _isShapeLocked = false;
+  ShapeType? _lockedShapeType;
+  Offset? _shapeStartPoint;
+  Offset? _shapeCurrentPoint;
+
   double _penSize = 1.0;
   double _eraserSize = 1.0;
   double _highlighterSize = 10.0;
@@ -67,6 +78,8 @@ class TopCanvasState extends State<TopCanvas> {
 
   @override
   void dispose() {
+    _lineSnapTimer?.cancel();
+    _shapeSnapTimer?.cancel();
     _textEditingController.dispose();
     _textFocusNode.dispose();
     super.dispose();
@@ -215,6 +228,15 @@ class TopCanvasState extends State<TopCanvas> {
   }
 
   void cancelCurrentStroke() {
+    _lineSnapTimer?.cancel();
+    _lineSnapTimer = null;
+    _shapeSnapTimer?.cancel();
+    _shapeSnapTimer = null;
+    _isShapeLocked = false;
+    _lockedShapeType = null;
+    _shapeStartPoint = null;
+    _shapeCurrentPoint = null;
+
     setState(() {
       _currentStroke = null;
       if (_lassoManager.currentMode == LassoMode.lassoing) {
@@ -226,6 +248,15 @@ class TopCanvasState extends State<TopCanvas> {
   }
 
   void handleDoubleTapCleanup() {
+    _lineSnapTimer?.cancel();
+    _lineSnapTimer = null;
+    _shapeSnapTimer?.cancel();
+    _shapeSnapTimer = null;
+    _isShapeLocked = false;
+    _lockedShapeType = null;
+    _shapeStartPoint = null;
+    _shapeCurrentPoint = null;
+
     setState(() {
       // 1. Cancel the active stroke from the second tap
       _currentStroke = null;
@@ -251,9 +282,14 @@ class TopCanvasState extends State<TopCanvas> {
   void _updateStroke(Offset position) {
     if (_currentStroke == null) return;
     setState(() {
-      _currentStroke!.points.add(position);
-      if (_currentStroke!.points.length >= kMaxPointsPerSegment) {
-        _splitCurrentStroke();
+      if (_isShapeLocked) {
+        _shapeCurrentPoint = position;
+        _updateLockedShapePoints();
+      } else {
+        _currentStroke!.points.add(position);
+        if (_currentStroke!.points.length >= kMaxPointsPerSegment) {
+          _splitCurrentStroke();
+        }
       }
     });
   }
@@ -287,6 +323,13 @@ class TopCanvasState extends State<TopCanvas> {
   }
 
   void _startStroke(Offset position) {
+    _lineSnapTimer?.cancel();
+    _shapeSnapTimer?.cancel();
+    _isShapeLocked = false;
+    _lockedShapeType = null;
+    _shapeStartPoint = position;
+    _shapeCurrentPoint = position;
+
     setState(() {
       _currentStroke = Stroke(
         points: [position],
@@ -294,9 +337,26 @@ class TopCanvasState extends State<TopCanvas> {
         color: penColor,
       );
     });
+
+    _lineSnapTimer = Timer(const Duration(milliseconds: 750), () {
+      _checkAndSnapLine();
+    });
+
+    _shapeSnapTimer = Timer(const Duration(milliseconds: 1500), () {
+      _checkAndSnapRectangle();
+    });
   }
 
   void _endStroke() {
+    _lineSnapTimer?.cancel();
+    _lineSnapTimer = null;
+    _shapeSnapTimer?.cancel();
+    _shapeSnapTimer = null;
+    _isShapeLocked = false;
+    _lockedShapeType = null;
+    _shapeStartPoint = null;
+    _shapeCurrentPoint = null;
+
     if (_currentStroke == null) return;
     topStrokeLen++;
 
@@ -316,6 +376,150 @@ class TopCanvasState extends State<TopCanvas> {
     }
     setState(() {});
     widget.onChanged?.call();
+  }
+
+  void _checkAndSnapLine() {
+    if (_currentStroke == null || _isShapeLocked) return;
+    final points = _currentStroke!.points;
+    if (points.length < 5) return;
+
+    final start = points.first;
+    final end = points.last;
+    final totalDist = (end - start).distance;
+
+    if (totalDist > 20) {
+      double maxDeviation = 0;
+      final lineVector = end - start;
+      final lineLenSq = lineVector.dx * lineVector.dx + lineVector.dy * lineVector.dy;
+      
+      for (int i = 1; i < points.length - 1; i++) {
+        final p = points[i];
+        double dev = 0;
+        if (lineLenSq > 0) {
+          final t = ((p.dx - start.dx) * lineVector.dx + (p.dy - start.dy) * lineVector.dy) / lineLenSq;
+          final clampedT = t.clamp(0.0, 1.0);
+          final proj = Offset(start.dx + clampedT * lineVector.dx, start.dy + clampedT * lineVector.dy);
+          dev = (p - proj).distance;
+        } else {
+          dev = (p - start).distance;
+        }
+        if (dev > maxDeviation) maxDeviation = dev;
+      }
+
+      if (maxDeviation < 15.0 && maxDeviation < totalDist * 0.15) {
+        _shapeSnapTimer?.cancel();
+        _lockShape(ShapeType.line, start, end);
+      }
+    }
+  }
+
+  void _checkAndSnapRectangle() {
+    if (_currentStroke == null || _isShapeLocked) return;
+    final points = _currentStroke!.points;
+    if (points.length < 5) return;
+
+    double minX = points[0].dx, maxX = points[0].dx;
+    double minY = points[0].dy, maxY = points[0].dy;
+    for (final p in points) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+
+    final width = maxX - minX;
+    final height = maxY - minY;
+    final closureDist = (points.first - points.last).distance;
+
+    if (width > 20 && height > 20) {
+      int cornersVisited = 0;
+      final cornerThreshold = min(width, height) * 0.35;
+      final tl = Offset(minX, minY);
+      final tr = Offset(maxX, minY);
+      final br = Offset(maxX, maxY);
+      final bl = Offset(minX, maxY);
+
+      bool hasTl = false, hasTr = false, hasBr = false, hasBl = false;
+      for (final p in points) {
+        if ((p - tl).distance < cornerThreshold) hasTl = true;
+        if ((p - tr).distance < cornerThreshold) hasTr = true;
+        if ((p - br).distance < cornerThreshold) hasBr = true;
+        if ((p - bl).distance < cornerThreshold) hasBl = true;
+      }
+      if (hasTl) cornersVisited++;
+      if (hasTr) cornersVisited++;
+      if (hasBr) cornersVisited++;
+      if (hasBl) cornersVisited++;
+
+      if (cornersVisited >= 3 && closureDist < (width + height) * 0.8) {
+        _lockShape(ShapeType.rectangle, Offset(minX, minY), Offset(maxX, maxY));
+      }
+    }
+  }
+
+  void _lockShape(ShapeType type, Offset p1, Offset p2) {
+    setState(() {
+      _isShapeLocked = true;
+      _lockedShapeType = type;
+      _shapeStartPoint = p1;
+      _shapeCurrentPoint = p2;
+      _updateLockedShapePoints();
+    });
+  }
+
+  void _updateLockedShapePoints() {
+    if (_currentStroke == null || !_isShapeLocked || _shapeStartPoint == null || _shapeCurrentPoint == null) return;
+    
+    final p1 = _shapeStartPoint!;
+    final p2 = _shapeCurrentPoint!;
+    final List<Offset> newPoints = [];
+
+    switch (_lockedShapeType) {
+      case ShapeType.line:
+        final dist = (p2 - p1).distance;
+        if (dist < 1) {
+          newPoints.add(p1);
+        } else {
+          int steps = max(2, (dist / 2).ceil());
+          for (int i = 0; i <= steps; i++) {
+            double t = i / steps;
+            newPoints.add(Offset(p1.dx + (p2.dx - p1.dx) * t, p1.dy + (p2.dy - p1.dy) * t));
+          }
+        }
+        break;
+
+      case ShapeType.rectangle:
+        final minX = min(p1.dx, p2.dx);
+        final maxX = max(p1.dx, p2.dx);
+        final minY = min(p1.dy, p2.dy);
+        final maxY = max(p1.dy, p2.dy);
+
+        final tl = Offset(minX, minY);
+        final tr = Offset(maxX, minY);
+        final br = Offset(maxX, maxY);
+        final bl = Offset(minX, maxY);
+
+        void addSegment(Offset start, Offset end) {
+          final d = (end - start).distance;
+          int steps = max(1, (d / 2).ceil());
+          for (int i = 0; i <= steps; i++) {
+            double t = i / steps;
+            newPoints.add(Offset(start.dx + (end.dx - start.dx) * t, start.dy + (end.dy - start.dy) * t));
+          }
+        }
+
+        addSegment(tl, tr);
+        addSegment(tr, br);
+        addSegment(br, bl);
+        addSegment(bl, tl);
+        break;
+
+      default:
+        break;
+    }
+
+    _currentStroke!.points.clear();
+    _currentStroke!.points.addAll(newPoints);
   }
 
   void setStrokes(List<Stroke> strokes) {

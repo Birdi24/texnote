@@ -16,8 +16,8 @@ Widget nothing_view(
   String subText = "Start a new Note or Folder to find it here";
   
   if (control == 0) {
-    emptyText = "No PDF Notes";
-    subText = "Imported PDFs will appear here";
+    emptyText = "No Recent Files";
+    subText = "Recently opened files will appear here";
   } else if (control == 2) {
     emptyText = "No Favorites";
     subText = "Notes you star will appear here";

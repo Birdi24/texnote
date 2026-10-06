@@ -273,49 +273,33 @@ class CanvasViewState extends State<CanvasView> {
   void _handleStylusPointer(PointerEvent event) {
     if (event.kind != PointerDeviceKind.stylus) return;
 
-    final int stylusButtons = event.buttons & (kPrimaryStylusButton | kSecondaryStylusButton);
-    final bool buttonPressed = stylusButtons != 0;
+    final bool buttonPressed = event.buttons != 0 && event.buttons != 0x01;
     final bool newButtonPress = buttonPressed && _previousStylusButtons == 0;
 
-    _previousStylusButtons = stylusButtons;
+    _previousStylusButtons = buttonPressed ? event.buttons : 0;
     if (!newButtonPress) return;
 
-    _stylusButtonHeld = true;
-
-    final now = DateTime.now();
-    final bool doublePress = _lastStylusButtonPress != null &&
-        now.difference(_lastStylusButtonPress!) <= _stylusDoublePressWindow;
-
-    if (doublePress) {
-      _lastStylusButtonPress = null;
-      _onToolChanged(DrawingTool.lasso);
-      return;
-    }
-
-    _lastStylusButtonPress = now;
-
-    if (_selectedTool == DrawingTool.lasso) {
-      _onToolChanged(_lastPenEraserTool);
-    } else if (_selectedTool == DrawingTool.pen) {
+    if (_selectedTool == DrawingTool.pen || _selectedTool == DrawingTool.highlighter) {
+      _lastPenEraserTool = _selectedTool;
       _onToolChanged(DrawingTool.eraser2);
     } else if (_selectedTool == DrawingTool.eraser2) {
-      _onToolChanged(DrawingTool.pen);
+      _onToolChanged(_lastPenEraserTool);
+    } else {
+      _onToolChanged(DrawingTool.eraser2);
     }
   }
 
   void _handleStylusPointerUp(PointerEvent event) {
     if (event.kind != PointerDeviceKind.stylus) return;
-    final int stylusButtons = event.buttons & (kPrimaryStylusButton | kSecondaryStylusButton);
-    _previousStylusButtons = stylusButtons;
-    if (stylusButtons == 0) {
+    final bool buttonPressed = event.buttons != 0 && event.buttons != 0x01;
+    if (!buttonPressed) {
+      _previousStylusButtons = 0;
       _stylusButtonHeld = false;
     }
   }
 
   void _onPointerDown(PointerDownEvent event) {
     _handleStylusPointer(event);
-
-    if (_stylusButtonHeld) return;
 
     if (_activePointers.isEmpty) {
       _drawingSuspended = false;
@@ -432,7 +416,7 @@ class CanvasViewState extends State<CanvasView> {
     setState(() {
       _selectedTool = tool;
 
-      if (tool == DrawingTool.pen || tool == DrawingTool.eraser2) {
+      if (tool == DrawingTool.pen || tool == DrawingTool.highlighter) {
         _lastPenEraserTool = tool;
       }
 
@@ -801,6 +785,7 @@ class CanvasViewState extends State<CanvasView> {
               onPointerMove: _onPointerMove,
               onPointerUp: _onPointerUp,
               onPointerCancel: _onPointerCancel,
+              onPointerHover: _handleStylusPointer,
               onPointerSignal: _onPointerSignal,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,

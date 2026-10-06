@@ -4,7 +4,6 @@ import 'package:path/path.dart' as p;
 
 import '../../app_style.dart';
 import '../../models/Note.dart';
-import '../../models/HandwrittenNote.dart';
 import '../../models/folder.dart';
 import '../../widgets/glass_container.dart';
 import 'home_body.dart';
@@ -18,6 +17,7 @@ class HomeScreen extends StatefulWidget {
   final List<Note> allNotes;
   final List<Folder> rootFolders;
   final List<Note> favorites;
+  final List<Note> recentNotes;
   final String? appDirPath;
   final Map<String, int> openNotes;
   final int currentTabIndex;
@@ -39,6 +39,7 @@ class HomeScreen extends StatefulWidget {
     required this.allNotes,
     required this.rootFolders,
     required this.favorites,
+    required this.recentNotes,
     required this.appDirPath,
     required this.openNotes,
     required this.currentTabIndex,
@@ -118,15 +119,17 @@ class _HomeScreenState extends State<HomeScreen>
 
   ThemeManager get themeManager => widget.themeManager;
 
-  List<Note> get pdfNotes => widget.allNotes.where((n) {
-    if (n is HandwrittenNote) {
-      return n.pdfSourcePath.isNotEmpty;
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_pageController.hasClients && _pageController.page?.round() != widget.tabState.control) {
+      _pageController.jumpToPage(widget.tabState.control);
     }
-    return false;
-  }).toList();
+  }
 
   Future<void> onControlChanged(int newControl) async {
     if (newControl == tabState.control) return;
+    final oldControl = tabState.control;
     setState(() {
       tabState.control = newControl;
       _isAnimating = true;
@@ -134,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (_pageController.hasClients) {
       await _pageController.animateToPage(
         newControl,
-        duration: Duration(milliseconds: 300 * (newControl - tabState.control).abs()),
+        duration: Duration(milliseconds: 300 * (newControl - oldControl).abs()),
         curve: Curves.easeInOut,
       );
     }
@@ -188,12 +191,12 @@ class _HomeScreenState extends State<HomeScreen>
                     if (!_isAnimating) setState(() => tabState.control = index);
                   },
                   children: [
-                    // Tab 0: PDFs
+                    // Tab 0: Recents
                     home_body(
                       control: 0,
                       context: context,
-                      notes: pdfNotes,
-                      displayedNotes: pdfNotes.where((n) => n.title.toLowerCase().contains(tabState.searchQuery)).toList(),
+                      notes: widget.recentNotes,
+                      displayedNotes: widget.recentNotes.where((n) => n.title.toLowerCase().contains(tabState.searchQuery)).toList(),
                       folders: [],
                       onNoteChanged: widget.onNoteChanged,
                       onNoteDeleted: widget.onNoteDeleted,

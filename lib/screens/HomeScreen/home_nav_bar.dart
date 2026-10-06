@@ -8,7 +8,7 @@ import '../../widgets/glass_container.dart';
 import '../../widgets/new_file_button.dart';
 import '../../widgets/single_circle_button.dart';
 
-/// This has 4 buttons: PDFs, Notes, Favorites, Add
+/// This has 4 buttons: Recents, Notes, Favorites, Add
 /// They are aligned bottom center
 Widget home_nav_bar(Future<void> Function([Note?]) onNoteChanged, context, screenWidth, control, onControlChanged, folders, notes, addOrRemoveFavorite, selectedFolder, Future<void> Function(BuildContext, Note) openNote) {
   return Align(
@@ -26,7 +26,7 @@ Widget home_nav_bar(Future<void> Function([Note?]) onNoteChanged, context, scree
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 (screenWidth > 400) ? const SizedBox.shrink() : const SizedBox(width: 5),
-                _buildNavButton(Icons.picture_as_pdf_outlined, "PDFs", control == 0, onControlChanged, 0, context),
+                _buildNavButton(LucideIcons.clock, "Recents", control == 0, onControlChanged, 0, context),
                 _buildNavButton(Icons.folder_open_outlined, "Notes", control == 1, onControlChanged, 1, context),
                 _buildNavButton(LucideIcons.star, "Favorites", control == 2, onControlChanged, 2, context),
                 (screenWidth > 400) ? const SizedBox.shrink() : const SizedBox(width: 5),

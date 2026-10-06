@@ -11,7 +11,7 @@ import '../../models/folder.dart';
 
 /// displays what subsection of the HomeScreen is being viewed
 Widget title(int control, Folder? selectedFolder) {
-  final textSrc = ["PDFs", "Notes", "Favorites"];
+  final textSrc = ["Recents", "Notes", "Favorites"];
   String text = textSrc[control];
   
   if (control == 1 && selectedFolder != null) {

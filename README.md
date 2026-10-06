@@ -26,7 +26,8 @@ A modern Flutter note-taking app for tablets and desktop development. BirdWrite 
 - Text Box *(under construction)*
 - Undo/redo
 - Lasso selection
-- Stylus button support *(under construction)*
+- Stylus button support (pen and eraser toggle)
+- Shape correction for the current stroke i.e. straight looking lines become straight, a stroke held for 1.5+ seconds becomes a shapable rectangle
 - Multiple pages
 - Add, duplicate, delete and reorder pages
 - PDF pages as backgrounds *(under construction)*
@@ -45,6 +46,10 @@ Organize your notes into folders. You can:
 ### Favorites
 
 - Mark notes as favorites for quick access
+
+### Recents
+
+- View recently opened files (tracking up to the last 5 opened files) with a clock icon on the home screen
 
 ### Search
 

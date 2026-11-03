@@ -429,9 +429,13 @@ class HandwrittenNote extends Note {
 
   @override
   Widget display() {
-    return Column(
-      children: [
-      AspectRatio(aspectRatio: 0.72, child :Container(
+    return Hero(
+      tag: path,
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
+          AspectRatio(aspectRatio: 0.72, child :Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: collection_color(cover),
@@ -485,7 +489,9 @@ class HandwrittenNote extends Note {
             fontSize: 12,
           ),
         ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 

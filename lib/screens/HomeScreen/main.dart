@@ -220,24 +220,41 @@ class _HomeScreenState extends State<HomeScreen>
                           return title.toLowerCase().contains(tabState.searchQuery);
                         }).toList();
                         
-                        return home_body(
-                          control: 1,
-                          context: context,
-                          notes: widget.allNotes,
-                          displayedNotes: filteredItems.whereType<Note>().toList(),
-                          folders: filteredItems.whereType<Folder>().toList(),
-                          onNoteChanged: widget.onNoteChanged,
-                          onNoteDeleted: widget.onNoteDeleted,
-                          onFolderDeleted: widget.onFolderDeleted,
-                          onNotesDeleted: widget.onNotesDeleted,
-                          onNoteAdded: widget.onNoteChanged,
-                          addToFavorites: widget.addOrRemoveFavorite,
-                          selectedFolder: tabState.currentFolder,
-                          inFolder: tabState.currentFolder != null,
-                          openFolder: openFolder,
-                          allFolders: widget.rootFolders,
-                          openNote: widget.openNote,
-                          openNotes: widget.openNotes,
+                        return AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+                                  CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                                ),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: KeyedSubtree(
+                            key: ValueKey<String>(tabState.currentFolder?.path ?? 'root_${tabState.searchQuery}'),
+                            child: home_body(
+                              control: 1,
+                              context: context,
+                              notes: widget.allNotes,
+                              displayedNotes: filteredItems.whereType<Note>().toList(),
+                              folders: filteredItems.whereType<Folder>().toList(),
+                              onNoteChanged: widget.onNoteChanged,
+                              onNoteDeleted: widget.onNoteDeleted,
+                              onFolderDeleted: widget.onFolderDeleted,
+                              onNotesDeleted: widget.onNotesDeleted,
+                              onNoteAdded: widget.onNoteChanged,
+                              addToFavorites: widget.addOrRemoveFavorite,
+                              selectedFolder: tabState.currentFolder,
+                              inFolder: tabState.currentFolder != null,
+                              openFolder: openFolder,
+                              allFolders: widget.rootFolders,
+                              openNote: widget.openNote,
+                              openNotes: widget.openNotes,
+                            ),
+                          ),
                         );
                       }
                     ),

@@ -282,7 +282,7 @@ class TopCanvasState extends State<TopCanvas> {
         _updateLockedShapePoints();
       } else {
         _currentStroke!.points.add(position);
-        if (_currentStroke!.points.length >= kMaxPointsPerSegment) {
+        if (_selectedTool != DrawingTool.highlighter && _currentStroke!.points.length >= kMaxPointsPerSegment) {
           _splitCurrentStroke();
         }
       }
@@ -333,13 +333,15 @@ class TopCanvasState extends State<TopCanvas> {
       );
     });
 
-    _lineSnapTimer = Timer(const Duration(milliseconds: 750), () {
-      _checkAndSnapLine();
-    });
+    if (_selectedTool != DrawingTool.highlighter) {
+      _lineSnapTimer = Timer(const Duration(milliseconds: 750), () {
+        _checkAndSnapLine();
+      });
 
-    _shapeSnapTimer = Timer(const Duration(milliseconds: 1500), () {
-      _checkAndSnapRectangle();
-    });
+      _shapeSnapTimer = Timer(const Duration(milliseconds: 1500), () {
+        _checkAndSnapRectangle();
+      });
+    }
   }
 
   void _endStroke() {

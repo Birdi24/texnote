@@ -175,8 +175,12 @@ class TextNote extends Note {
   /// returns a widget representing the note
   @override
   Widget display() {
-    return Column(
-      children: [
+    return Hero(
+      tag: path,
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
         AspectRatio(aspectRatio: 0.72, child :Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -228,7 +232,9 @@ class TextNote extends Note {
             fontSize: 12,
           ),
         ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 

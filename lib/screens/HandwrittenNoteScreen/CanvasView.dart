@@ -507,19 +507,17 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       final centerX = (-offset.dx + viewportSize.width / 2) / scale;
       final centerY = (-offset.dy + viewportSize.height / 2) / scale;
       
-      final int pageIdx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
-      final relativePos = Offset(centerX - 100, (centerY - 100) - (pageIdx * _basePageHeight));
+      final globalPos = Offset(centerX - 100, centerY - 100);
 
       final newImageData = ImageData(
-        position: relativePos,
+        position: globalPos,
         imagePath: newPath,
       );
 
-      setState(() {
-        widget.pages[pageIdx].images.add(newImageData);
-      });
-      widget.onChanged();
+      widget.topCanvasKey.currentState?.addImage(newImageData);
+      _onToolChanged(DrawingTool.lasso);
       _recordHistory();
+      final int pageIdx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
       _updateThumbnailCache(pageIdx);
     }
   }
@@ -783,6 +781,27 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     }
     if (selected.isNotEmpty) _recordHistory();
     return selected;
+  }
+
+  ImageData? _hitImageFromBottom(Offset position) {
+    for (int pageIndex = widget.pages.length - 1; pageIndex >= 0; pageIndex--) {
+      final page = widget.pages[pageIndex];
+      final pageOffset = Offset(0, pageIndex * _basePageHeight);
+
+      for (int imageIndex = page.images.length - 1; imageIndex >= 0; imageIndex--) {
+        final image = page.images[imageIndex];
+        final globalImage = image.translate(pageOffset);
+        if (!globalImage.getBounds().contains(position)) continue;
+
+        setState(() {
+          page.images.removeAt(imageIndex);
+        });
+        _updateThumbnailCache(pageIndex);
+        _recordHistory();
+        return globalImage;
+      }
+    }
+    return null;
   }
   
   List<TextData> _selectTextsFromBottom(Path lassoPath) {
@@ -1052,6 +1071,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                                     onEraseFromBottom: _eraseFromBottom,
                                     onSelectStrokesFromBottom: _selectFromBottom,
                                     onSelectImagesFromBottom: _selectImagesFromBottom,
+                                    onHitImageFromBottom: _hitImageFromBottom,
                                     onSelectTextsFromBottom: _selectTextsFromBottom,
                                   ),
                                 ),

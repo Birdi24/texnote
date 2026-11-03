@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:birdwrite/screens/HandwrittenNoteScreen/canvas_options.dart';
 import '../../app_style.dart';
@@ -22,6 +23,7 @@ class TopCanvas extends StatefulWidget {
   final void Function(Offset position)? onEraseFromBottom;
   final List<Stroke> Function(Path lassoPath)? onSelectStrokesFromBottom;
   final List<ImageData> Function(Path lassoPath)? onSelectImagesFromBottom;
+  final ImageData? Function(Offset position)? onHitImageFromBottom;
   final List<TextData> Function(Path lassoPath)? onSelectTextsFromBottom;
   final Function(DrawingTool)? onToolChanged;
 
@@ -34,6 +36,7 @@ class TopCanvas extends StatefulWidget {
     this.onEraseFromBottom,
     this.onSelectStrokesFromBottom,
     this.onSelectImagesFromBottom,
+    this.onHitImageFromBottom,
     this.onSelectTextsFromBottom,
     this.onToolChanged,
   });
@@ -73,6 +76,7 @@ class TopCanvasState extends State<TopCanvas> {
   TextData? _editingText;
   final TextEditingController _textEditingController = TextEditingController();
   final FocusNode _textFocusNode = FocusNode();
+  final Map<int, PointerDeviceKind> _activePointerKinds = {};
   DateTime? _lastPointerDownTime;
   Offset? _lastPointerDownPos;
 
@@ -120,6 +124,11 @@ class TopCanvasState extends State<TopCanvas> {
       } else if (tool == DrawingTool.eraser2) {
         penColor = BG;
         penSize = _eraserSize;
+        if (_lassoManager.selectedStrokes.isNotEmpty) {
+          _lassoManager.selectedStrokes.clear();
+          _lassoManager.updateSelectionRect();
+          widget.onChanged?.call();
+        }
       } else if (tool == DrawingTool.highlighter) {
         penColor = Colors.yellow.withAlpha(77);
         penSize = _highlighterSize;
@@ -864,12 +873,57 @@ class TopCanvasState extends State<TopCanvas> {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onLongPressStart: (details) {
-          if (widget.suspended()) return;
+          if (_activePointerKinds.isEmpty ||
+              _activePointerKinds.values.any((kind) => kind != PointerDeviceKind.touch)) {
+            return;
+          }
+
+          ImageData? hitImage;
+          for (var img in _lassoManager.selectedImages) {
+            if (img.getBounds().contains(details.localPosition)) {
+              hitImage = img;
+              break;
+            }
+          }
+          if (hitImage == null) {
+            for (var img in _topLayerImages) {
+              if (img.getBounds().contains(details.localPosition)) {
+                hitImage = img;
+                break;
+              }
+            }
+          }
+          if (hitImage == null && widget.onHitImageFromBottom != null) {
+            hitImage = widget.onHitImageFromBottom!(details.localPosition);
+          }
+
+          if (hitImage != null) {
+            cancelCurrentStroke();
+            setState(() {
+              _editingText = null;
+              _toplayer.addAll(_lassoManager.selectedStrokes);
+              _topLayerImages.addAll(_lassoManager.selectedImages);
+              _topLayerTexts.addAll(_lassoManager.selectedTexts);
+              _lassoManager.selectedStrokes = [];
+              _lassoManager.selectedImages = [hitImage!];
+              _lassoManager.selectedTexts = [];
+              _topLayerImages.remove(hitImage);
+              _lassoManager.updateSelectionRect();
+              _lassoManager.currentMode = LassoMode.moving;
+              _selectedTool = DrawingTool.lasso;
+            });
+            widget.onToolChanged?.call(DrawingTool.lasso);
+            widget.onChanged?.call();
+            return;
+          }
+
+          cancelCurrentStroke();
           _showCanvasContextMenu(details.localPosition);
         },
         child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (event) {
+          _activePointerKinds[event.pointer] = event.kind;
           if (widget.suspended()) return;
           _lastPointerPos = event.localPosition;
 
@@ -1100,7 +1154,7 @@ class TopCanvasState extends State<TopCanvas> {
           }
           _lastPointerPos = event.localPosition;
         },
-        onPointerUp: (_) {
+        onPointerUp: (event) {
           if (_selectedTool == DrawingTool.lasso || _selectedTool == DrawingTool.text) {
             setState(() {
               _lassoManager.activeHandle = ResizeHandle.none;
@@ -1123,8 +1177,9 @@ class TopCanvasState extends State<TopCanvas> {
             _endStroke();
           }
           _lastPointerPos = null;
+          _activePointerKinds.remove(event.pointer);
         },
-        onPointerCancel: (_) {
+        onPointerCancel: (event) {
           if (_selectedTool == DrawingTool.lasso) {
             setState(() {
               if (_lassoManager.currentMode == LassoMode.lassoing) {
@@ -1137,6 +1192,7 @@ class TopCanvasState extends State<TopCanvas> {
             _endStroke();
           }
           _lastPointerPos = null;
+          _activePointerKinds.remove(event.pointer);
         },
         child: Stack(
           fit: StackFit.expand,

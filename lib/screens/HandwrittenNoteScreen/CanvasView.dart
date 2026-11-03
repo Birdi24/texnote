@@ -55,9 +55,10 @@ class CanvasView extends StatefulWidget {
   State<CanvasView> createState() => CanvasViewState();
 }
 
-class CanvasViewState extends State<CanvasView> {
+class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
   final CanvasTransformationController _transformationController = CanvasTransformationController();
   final CanvasHistoryManager _historyManager = CanvasHistoryManager();
+  AnimationController? _scrollAnimationController;
 
   Size? _lastScreenSize;
   final Map<int, PointerDeviceKind> _activePointers = <int, PointerDeviceKind>{};
@@ -97,6 +98,9 @@ class CanvasViewState extends State<CanvasView> {
   // Cache rasterized page thumbnails to prevent vector re-paints
   final Map<String, ui.Image> _thumbnailCache = {};
 
+  late AnimationController _pageManagerController;
+  late Animation<Offset> _pageManagerSlideAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -106,6 +110,17 @@ class CanvasViewState extends State<CanvasView> {
     _numPages = widget.pages.length;
 
     _recomputeContentBounds();
+
+    _pageManagerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _pageManagerSlideAnimation = Tween<Offset>(
+      begin: const Offset(1.0, 0.0),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _pageManagerController, curve: Curves.easeInOut),
+    );
 
     _transformationController.addListener(_onTransformationChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -120,10 +135,63 @@ class CanvasViewState extends State<CanvasView> {
 
   @override
   void dispose() {
+    _pageManagerController.dispose();
+    _scrollAnimationController?.dispose();
     _transformationController.removeListener(_onTransformationChanged);
     _transformationController.dispose();
     _clearThumbnailCache();
     super.dispose();
+  }
+
+  void _togglePageManager() {
+    if (_showPageManager) {
+      _pageManagerController.reverse().then((_) {
+        if (mounted) {
+          setState(() {
+            _showPageManager = false;
+          });
+        }
+      });
+    } else {
+      setState(() {
+        _showPageManager = true;
+      });
+      _pageManagerController.forward(from: 0.0);
+    }
+  }
+
+  void _closePageManager() {
+    _pageManagerController.reverse().then((_) {
+      if (mounted) {
+        setState(() {
+          _showPageManager = false;
+        });
+      }
+    });
+  }
+
+  void _animateOffset(Offset start, Offset end) {
+    _scrollAnimationController?.dispose();
+    _scrollAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    final animation = CurvedAnimation(
+      parent: _scrollAnimationController!,
+      curve: Curves.easeInOut,
+    );
+    animation.addListener(() {
+      if (_lastScreenSize != null) {
+        final currentOffset = Offset.lerp(start, end, animation.value)!;
+        _transformationController.setOffset(
+          currentOffset,
+          _lastScreenSize!,
+          _pageWidth,
+          _pageHeight,
+        );
+      }
+    });
+    _scrollAnimationController!.forward();
   }
 
   void _clearThumbnailCache() {
@@ -487,27 +555,17 @@ class CanvasViewState extends State<CanvasView> {
       final thresholdY = insertIndex * _basePageHeight;
       final shiftDelta = Offset(0, _basePageHeight);
       widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
-
-      // Thumbnail cache remains valid for existing pages since it's ID-based.
-      // We don't need to shift anything in _thumbnailCache anymore.
-
-      if (atIndex == null) {
-        _transformationController.setOffset(
-          Offset(_transformationController.offset.dx, -thresholdY),
-          viewportSize,
-          _pageWidth,
-          _pageHeight,
-        );
-      }
     });
 
     _recordHistory();
     _updateThumbnailCache(insertIndex);
+    _scrollToPage(insertIndex);
   }
 
   void _duplicatePage(Size viewportSize, {int? atIndex}) {
     final index = atIndex ?? _currentPageIndex;
     final original = widget.pages[index];
+    final insertIndex = index + 1;
 
     final duplicate = NotePage(
       source: PageSource(
@@ -521,7 +579,6 @@ class CanvasViewState extends State<CanvasView> {
     );
 
     setState(() {
-      final insertIndex = index + 1;
       widget.pages.insert(
         insertIndex.clamp(0, widget.pages.length),
         duplicate,
@@ -532,26 +589,18 @@ class CanvasViewState extends State<CanvasView> {
       final thresholdY = insertIndex * _basePageHeight;
       final shiftDelta = Offset(0, _basePageHeight);
       widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
-
-      if (atIndex == null) {
-        _transformationController.setOffset(
-          Offset(_transformationController.offset.dx, -thresholdY),
-          viewportSize,
-          _pageWidth,
-          _pageHeight,
-        );
-      }
     });
 
     _recordHistory();
-    _updateThumbnailCache(index + 1);
+    _updateThumbnailCache(insertIndex);
+    _scrollToPage(insertIndex);
   }
   
   void _deletePage(Size viewportSize, {int? atIndex}) {
     if (_numPages <= 1) return;
 
+    final deleteIndex = atIndex ?? _currentPageIndex;
     setState(() {
-      final deleteIndex = atIndex ?? _currentPageIndex;
       final pageToDelete = widget.pages.removeAt(deleteIndex);
 
       _recomputeContentBounds();
@@ -565,16 +614,15 @@ class CanvasViewState extends State<CanvasView> {
       // Update thumbnail cache by ID
       final img = _thumbnailCache.remove(pageToDelete.id);
       img?.dispose();
-
-      if (_currentPageIndex >= _numPages) {
-        _currentPageIndex = _numPages - 1;
-      }
     });
 
     _recordHistory();
+    final targetIndex = deleteIndex.clamp(0, widget.pages.length - 1);
+    _scrollToPage(targetIndex);
   }
 
   void _movePage(int index, int direction) {
+    if (index != _currentPageIndex) return;
     int targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= _numPages) return;
 
@@ -604,17 +652,45 @@ class CanvasViewState extends State<CanvasView> {
 
     _updateThumbnailCache(index);
     _updateThumbnailCache(targetIndex);
+
+    _scrollToPage(targetIndex);
+
+    _showPageMovedPopup("Page Moved: ${index + 1} -> ${targetIndex + 1}");
   }
 
   void _scrollToPage(int index) {
-    if (_lastScreenSize == null) return;
-    final targetY = -index * _basePageHeight;
-    _transformationController.setOffset(
-      Offset(_transformationController.offset.dx, targetY),
-      _lastScreenSize!,
-      _pageWidth,
-      _pageHeight,
+    setState(() {
+      _currentPageIndex = index.clamp(0, _numPages - 1);
+    });
+    if (_lastScreenSize != null) {
+      final targetY = -_currentPageIndex * _basePageHeight;
+      final startOffset = _transformationController.offset;
+      final endOffset = _transformationController.clampOffset(
+        Offset(startOffset.dx, targetY),
+        _transformationController.scale,
+        _lastScreenSize!,
+        _pageWidth,
+        _pageHeight,
+      );
+      _animateOffset(startOffset, endOffset);
+    }
+    widget.onPageChanged?.call(_currentPageIndex);
+  }
+
+  void _showPageMovedPopup(String message) {
+    final overlayState = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => _PageMovedPopup(
+        message: message,
+        onDismiss: () {
+          overlayEntry.remove();
+        },
+      ),
     );
+
+    overlayState.insert(overlayEntry);
   }
 
   void _switchEraserType() {
@@ -1118,22 +1194,25 @@ class CanvasViewState extends State<CanvasView> {
                       basePageHeight: _basePageHeight,
                       safeHeight: safeHeight,
                       viewportSize: viewportSize,
-                      onTogglePageManager: () => setState(() => _showPageManager = !_showPageManager),
+                      onTogglePageManager: _togglePageManager,
                     ),
                     if (_showPageManager)
                       Positioned(
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        child: PageListView(
-                          currentPage: _currentPageIndex,
-                          numPages: _numPages,
-                          onMovePage: _movePage,
-                          onAddPageBelow: (index) => _addPage(viewportSize, atIndex: index),
-                          onDuplicatePage: (index) => _duplicatePage(viewportSize, atIndex: index),
-                          onDeletePage: (index) => _deletePage(viewportSize, atIndex: index),
-                          onPageTap: _scrollToPage,
-                          onClose: () => setState(() => _showPageManager = false),
+                        child: SlideTransition(
+                          position: _pageManagerSlideAnimation,
+                          child: PageListView(
+                            currentPage: _currentPageIndex,
+                            numPages: _numPages,
+                            onMovePage: _movePage,
+                            onAddPageBelow: (index) => _addPage(viewportSize, atIndex: index),
+                            onDuplicatePage: (index) => _duplicatePage(viewportSize, atIndex: index),
+                            onDeletePage: (index) => _deletePage(viewportSize, atIndex: index),
+                            onPageTap: _scrollToPage,
+                            onClose: _closePageManager,
+                          ),
                         ),
                       ),
                     Positioned(
@@ -1180,6 +1259,101 @@ class CanvasViewState extends State<CanvasView> {
             ),
           ));
       },
+    );
+  }
+}
+
+class _PageMovedPopup extends StatefulWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _PageMovedPopup({required this.message, required this.onDismiss});
+
+  @override
+  State<_PageMovedPopup> createState() => _PageMovedPopupState();
+}
+
+class _PageMovedPopupState extends State<_PageMovedPopup> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 100),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1.0),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    _controller.forward();
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        _controller.reverse().then((_) {
+          widget.onDismiss();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      bottom: 30,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _opacityAnimation,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(50),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  widget.message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

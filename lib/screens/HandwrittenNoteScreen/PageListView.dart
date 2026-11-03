@@ -37,7 +37,38 @@ class _PageListViewState extends State<PageListView> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    // Removed jumpTo logic as it might be causing crashes during initial layout
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentPage();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant PageListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentPage != widget.currentPage || oldWidget.numPages != widget.numPages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToCurrentPage();
+      });
+    }
+  }
+
+  void _scrollToCurrentPage() {
+    if (!mounted || !_scrollController.hasClients) return;
+    const double itemHeight = 60.0;
+    const double topPadding = 10.0;
+    final double itemCenter = topPadding + (widget.currentPage * itemHeight) + (itemHeight / 2);
+    final double viewportHeight = _scrollController.position.viewportDimension;
+    final double centeredOffset = itemCenter - (viewportHeight / 2);
+    final double finalOffset = centeredOffset.clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+
+    _scrollController.animateTo(
+      finalOffset,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -109,7 +140,7 @@ class _PageListViewState extends State<PageListView> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  "Page ${index + 1}",
+                                  "${index + 1}",
                                   style: AppStyles.icon_text.copyWith(
                                     fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                                     fontSize: 15,
@@ -121,28 +152,27 @@ class _PageListViewState extends State<PageListView> {
                                 children: [
                                   _CompactAction(
                                     icon: LucideIcons.chevron_up, color: accent,
-                                    onPressed: index > 0 ? () => widget.onMovePage(index, -1) : null,
+                                    onPressed: (isCurrent && index > 0) ? () => widget.onMovePage(index, -1) : null,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 2),
                                   _CompactAction(
-                                    icon: LucideIcons.chevron_down,color: accent,
-                                    onPressed: index < widget.numPages - 1 ? () => widget.onMovePage(index, 1) : null,
+                                    icon: LucideIcons.chevron_down, color: accent,
+                                    onPressed: (isCurrent && index < widget.numPages - 1) ? () => widget.onMovePage(index, 1) : null,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 2),
                                   _CompactAction(
                                     icon: LucideIcons.file_plus, color: accent,
                                     onPressed: () => widget.onAddPageBelow(index),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 2),
                                   _CompactAction(
                                     icon: LucideIcons.copy, color: accent,
                                     onPressed: () => widget.onDuplicatePage(index),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 2),
                                   _CompactAction(
                                     icon: LucideIcons.trash, color: Colors.red,
                                     onPressed: widget.numPages > 1 ? () => _showDeleteConfirmation(context, index) : null,
-
                                   ),
                                 ],
                               ),
@@ -201,6 +231,7 @@ class _CompactAction extends StatelessWidget {
       child: IconButton(
         icon: Icon(icon, size: 16),
         color: color,
+        disabledColor: color.withAlpha(50),
         padding: EdgeInsets.zero,
         onPressed: onPressed,
         splashRadius: 16,

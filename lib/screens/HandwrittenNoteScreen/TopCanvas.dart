@@ -110,13 +110,6 @@ class TopCanvasState extends State<TopCanvas> {
   }
 
   void setTool(DrawingTool tool) {
-    if (tool == DrawingTool.duplicate) {
-      setState(() {
-        _lassoManager.duplicateSelectedItems(_toplayer, _topLayerImages, _topLayerTexts, widget.onChanged ?? () {});
-      });
-      return;
-    }
-
     DrawingTool oldTool = _selectedTool;
     _selectedTool = tool;
 
@@ -179,10 +172,12 @@ class TopCanvasState extends State<TopCanvas> {
     setState(() {
       penColor = color;
       
-      if (_selectedTool == DrawingTool.text) {
-        for (var txt in _lassoManager.selectedTexts) {
-          txt.color = color;
-        }
+      for (int i = 0; i < _lassoManager.selectedStrokes.length; i++) {
+        _lassoManager.selectedStrokes[i] = _lassoManager.selectedStrokes[i].copyWith(color: color);
+      }
+
+      for (var txt in _lassoManager.selectedTexts) {
+        txt.color = color;
       }
     });
     widget.onChanged?.call();
@@ -763,10 +758,114 @@ class TopCanvasState extends State<TopCanvas> {
     setState(() {});
   }
 
+  void _showCanvasContextMenu(Offset position) {
+    final bool hasSelection = _lassoManager.hasSelection;
+    final bool hasClipboard = _lassoManager.hasClipboard;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      builder: (context) => Stack(
+        children: [
+          Positioned(
+            left: position.dx.clamp(20.0, MediaQuery.of(context).size.width - 170.0),
+            top: position.dy.clamp(20.0, MediaQuery.of(context).size.height - 180.0),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: 150,
+                decoration: BoxDecoration(
+                  color: BG,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: glass_border, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: hasSelection ? () {
+                        Navigator.pop(context);
+                        setState(() {
+                          _lassoManager.cutSelection(_toplayer, _topLayerImages, _topLayerTexts);
+                        });
+                        widget.onChanged?.call();
+                      } : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.content_cut, size: 16, color: hasSelection ? icon_color : icon_color.withValues(alpha: 0.4)),
+                            const SizedBox(width: 10),
+                            Text('Cut', style: TextStyle(fontSize: 14, color: hasSelection ? icon_color : icon_color.withValues(alpha: 0.4))),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Divider(height: 1, color: glass_border),
+                    InkWell(
+                      onTap: hasSelection ? () {
+                        Navigator.pop(context);
+                        _lassoManager.copySelection();
+                      } : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.content_copy, size: 16, color: hasSelection ? icon_color : icon_color.withValues(alpha: 0.4)),
+                            const SizedBox(width: 10),
+                            Text('Copy', style: TextStyle(fontSize: 14, color: hasSelection ? icon_color : icon_color.withValues(alpha: 0.4))),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Divider(height: 1, color: glass_border),
+                    InkWell(
+                      onTap: hasClipboard ? () {
+                        Navigator.pop(context);
+                        setState(() {
+                          _lassoManager.pasteClipboard(_toplayer, _topLayerImages, _topLayerTexts, position);
+                        });
+                        widget.onChanged?.call();
+                      } : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.content_paste, size: 16, color: hasClipboard ? icon_color : icon_color.withValues(alpha: 0.4)),
+                            const SizedBox(width: 10),
+                            Text('Paste', style: TextStyle(fontSize: 14, color: hasClipboard ? icon_color : icon_color.withValues(alpha: 0.4))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: Listener(
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onLongPressStart: (details) {
+          if (widget.suspended()) return;
+          _showCanvasContextMenu(details.localPosition);
+        },
+        child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (event) {
           if (widget.suspended()) return;
@@ -1089,7 +1188,8 @@ class TopCanvasState extends State<TopCanvas> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildTextBox(TextData txt, {bool isSelected = false}) {

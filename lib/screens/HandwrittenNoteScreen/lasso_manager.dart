@@ -11,6 +11,13 @@ class LassoManager {
   List<Stroke> selectedStrokes = [];
   List<ImageData> selectedImages = [];
   List<TextData> selectedTexts = [];
+  List<Stroke> clipboardStrokes = [];
+  List<ImageData> clipboardImages = [];
+  List<TextData> clipboardTexts = [];
+
+  bool get hasClipboard => clipboardStrokes.isNotEmpty || clipboardImages.isNotEmpty || clipboardTexts.isNotEmpty;
+  bool get hasSelection => selectedStrokes.isNotEmpty || selectedImages.isNotEmpty || selectedTexts.isNotEmpty;
+
   List<Offset> lassoPoints = [];
   Path? lassoPath;
   Rect? selectionRect;
@@ -40,7 +47,24 @@ class LassoManager {
       bounds = bounds == null ? txtBounds : bounds.expandToInclude(txtBounds);
     }
 
-    selectionRect = bounds?.inflate(5.0);
+    if (bounds != null) {
+      const double minSize = 80.0;
+      double width = bounds.width;
+      double height = bounds.height;
+      if (width < minSize) {
+        width = minSize;
+      }
+      if (height < minSize) {
+        height = minSize;
+      }
+      selectionRect = Rect.fromCenter(
+        center: bounds.center,
+        width: width,
+        height: height,
+      ).inflate(5.0);
+    } else {
+      selectionRect = null;
+    }
   }
 
   void startLasso(Offset position, List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, List<TextData> topLayerTexts) {
@@ -246,24 +270,56 @@ class LassoManager {
     }
   }
 
-  void duplicateSelectedItems(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, List<TextData> topLayerTexts, VoidCallback onChanged) {
-    if (selectedStrokes.isEmpty && selectedImages.isEmpty && selectedTexts.isEmpty) return;
+  void copySelection() {
+    if (!hasSelection) return;
+    clipboardStrokes = selectedStrokes.map((s) => s.copy()).toList();
+    clipboardImages = selectedImages.map((i) => i.copy()).toList();
+    clipboardTexts = selectedTexts.map((t) => t.copy()).toList();
+  }
 
-    final List<Stroke> strokeCopies = selectedStrokes.map((s) => s.copy().translate(const Offset(20, 20))).toList();
-    final List<ImageData> imageCopies = selectedImages.map((i) => i.copy().translate(const Offset(20, 20))).toList();
-    final List<TextData> textCopies = selectedTexts.map((t) => t.copy().translate(const Offset(20, 20))).toList();
-    
-    topLayerStrokes.addAll(selectedStrokes);
-    selectedStrokes = strokeCopies;
+  void cutSelection(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, List<TextData> topLayerTexts) {
+    if (!hasSelection) return;
+    copySelection();
+    selectedStrokes = [];
+    selectedImages = [];
+    selectedTexts = [];
+    selectionRect = null;
+  }
 
-    topLayerImages.addAll(selectedImages);
-    selectedImages = imageCopies;
+  void pasteClipboard(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, List<TextData> topLayerTexts, Offset position) {
+    if (!hasClipboard) return;
 
-    topLayerTexts.addAll(selectedTexts);
-    selectedTexts = textCopies;
+    if (hasSelection) {
+      topLayerStrokes.addAll(selectedStrokes);
+      topLayerImages.addAll(selectedImages);
+      topLayerTexts.addAll(selectedTexts);
+      selectedStrokes = [];
+      selectedImages = [];
+      selectedTexts = [];
+      selectionRect = null;
+    }
+
+    Rect? cbBounds;
+    for (final s in clipboardStrokes) {
+      final b = s.getBounds();
+      cbBounds = cbBounds == null ? b : cbBounds.expandToInclude(b);
+    }
+    for (final i in clipboardImages) {
+      final b = i.getBounds();
+      cbBounds = cbBounds == null ? b : cbBounds.expandToInclude(b);
+    }
+    for (final t in clipboardTexts) {
+      final b = t.getBounds();
+      cbBounds = cbBounds == null ? b : cbBounds.expandToInclude(b);
+    }
+
+    final delta = cbBounds != null ? position - cbBounds.center : const Offset(20, 20);
+
+    selectedStrokes = clipboardStrokes.map((s) => s.copy().translate(delta)).toList();
+    selectedImages = clipboardImages.map((i) => i.copy().translate(delta)).toList();
+    selectedTexts = clipboardTexts.map((t) => t.copy().translate(delta)).toList();
 
     updateSelectionRect();
-    onChanged();
   }
 
   void clearSelection(List<Stroke> topLayerStrokes, List<ImageData> topLayerImages, List<TextData> topLayerTexts, VoidCallback onChanged) {

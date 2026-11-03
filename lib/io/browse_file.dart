@@ -62,6 +62,55 @@ class FileOpenerScreen {
       return null;
     }
   }
+
+  Future<HandwrittenNote?> importPdfFromUri(Uri uri) async {
+    try {
+      final bytes = await _saf.readFileBytes(uri.toString());
+      if (bytes == null) return null;
+
+      final appDocDir = await getApplicationDocumentsDirectory();
+      String title = p.basename(uri.path);
+      if (title.isEmpty || title == '/' || title == '.') {
+        title = "ImportedPdf_${DateTime.now().millisecondsSinceEpoch}";
+      }
+      title = title.replaceFirst(RegExp(r'\.[^.]+$'), '');
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final noteDir = Directory(
+        p.join(appDocDir.path, 'pdf_imports', '${title}_$timestamp'),
+      );
+      await noteDir.create(recursive: true);
+
+      final pdfPath = p.join(noteDir.path, 'source.pdf');
+      await File(pdfPath).writeAsBytes(bytes);
+
+      final document = await PdfDocument.openFile(pdfPath);
+      final pagesCount = document.pagesCount;
+      await document.close();
+
+      final notePath = p.join(appDocDir.path, '$title.note');
+      final note = HandwrittenNote(
+        title: title,
+        date: DateTime.now(),
+        path: notePath,
+        type: NoteType.HandwrittenNote,
+        pdfSourcePath: pdfPath,
+        pages: List.generate(
+          pagesCount,
+          (i) => NotePage(
+            background: "pdf_page:${i + 1}",
+            source: PageSource.pdf(i + 1),
+          ),
+        ),
+      );
+
+      await note.save("");
+      return note;
+    } catch (e) {
+      debugPrint("Error importing PDF from URI $uri: $e");
+      return null;
+    }
+  }
 }
 
 // collects the notes from the directory to display on the home screen

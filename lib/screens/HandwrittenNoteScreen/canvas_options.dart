@@ -8,7 +8,7 @@ import '../../app_style.dart';
 import '../../widgets/glass_container.dart';
 import '../../widgets/single_circle_button.dart';
 
-enum DrawingTool { pen, eraser2, highlighter, lasso, duplicate, text }
+enum DrawingTool { pen, eraser2, highlighter, lasso, text }
 
 Widget history_button_array(
     context,
@@ -43,10 +43,12 @@ Widget tool_button_array(
       Function(DrawingTool)? onToolChanged,
       Function()? onAddPage,
       Function()? onImportImage,
+      bool palmRejectionEnabled = true,
+      VoidCallback? onTogglePalmRejection,
     }) {
   final screenWidth = MediaQuery.of(context).size.width;
   return glassContainer(
-    width: 430,
+    width: 480,
     height: 60,
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -59,11 +61,21 @@ Widget tool_button_array(
          VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
 
         single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screenWidth, button_width: 35.0, bgAlpha: 160),
-        single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screenWidth, button_width: 35.0, bgAlpha: 160),
         single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screenWidth, button_width: 35.0, bgAlpha: 160),
 
          VerticalDivider(width: 1, indent: 15, endIndent: 15, color: icon_color),
-        
+
+        single_circle_button(
+          LucideIcons.hand,
+          20.0,
+          palmRejectionEnabled ? 90 : 40,
+          palmRejectionEnabled ? "palm rejection on" : "palm rejection off",
+          () => onTogglePalmRejection?.call(),
+          context,
+          screenWidth,
+          button_width: 35.0,
+          bgAlpha: 160,
+        ),
         single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screenWidth, button_width: 35.0, bgAlpha: 160),
       ],
     ),
@@ -80,6 +92,8 @@ Widget consolidated_tool_array(
       Function(DrawingTool)? onToolChanged,
       Function()? onAddPage,
       Function()? onImportImage,
+      bool palmRejectionEnabled = true,
+      VoidCallback? onTogglePalmRejection,
     }) {
   final screenWidth = MediaQuery.of(context).size.width;
 
@@ -97,8 +111,18 @@ Widget consolidated_tool_array(
     single_circle_button(LucideIcons.eraser, 20.0, selectedTool == DrawingTool.eraser2 ? 90 : 40, "eraser", () => onToolChanged?.call(DrawingTool.eraser2), context, screenWidth, button_width: 35.0, bgAlpha: 160),
     single_circle_button(LucideIcons.highlighter, 20.0, selectedTool == DrawingTool.highlighter ? 90 : 40, "highlighter", () => onToolChanged?.call(DrawingTool.highlighter), context, screenWidth, button_width: 35.0, bgAlpha: 160),
     single_circle_button(LucideIcons.lasso, 20.0, selectedTool == DrawingTool.lasso ? 90 : 40, "lasso", () => onToolChanged?.call(DrawingTool.lasso), context, screenWidth, button_width: 35.0, bgAlpha: 160),
-    single_circle_button(LucideIcons.copy, 20.0, selectedTool == DrawingTool.duplicate ? 40 : 40, "duplicate", () => onToolChanged?.call(DrawingTool.duplicate), context, screenWidth, button_width: 35.0, bgAlpha: 160),
     single_circle_button(LucideIcons.image, 20.0, 90, "import image", () => onImportImage?.call(), context, screenWidth, button_width: 35.0, bgAlpha: 160),
+    single_circle_button(
+      LucideIcons.hand,
+      20.0,
+      palmRejectionEnabled ? 90 : 40,
+      palmRejectionEnabled ? "palm rejection on" : "palm rejection off",
+      () => onTogglePalmRejection?.call(),
+      context,
+      screenWidth,
+      button_width: 35.0,
+      bgAlpha: 160,
+    ),
     single_circle_button(LucideIcons.file_plus, 20.0, 90, "add page", onAddPage!, context, screenWidth, button_width: 35.0, bgAlpha: 160),
   ];
 
@@ -136,11 +160,13 @@ Widget left_button_array(
       List<Color> quickColors = const [],
       Function(Color)? onColorChanged,
       VoidCallback? onOpenColorPicker,
+      bool palmRejectionEnabled = true,
+      VoidCallback? onTogglePalmRejection,
     }) {
   final screenWidth = MediaQuery.of(context).size.width;
   final screenHeight = MediaQuery.of(context).size.height;
 
-  return (DrawingTool.duplicate != selectedTool ) ? ConstrainedBox(
+  return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: screenHeight - 180),
       child: glassContainer(
           width: 55,
@@ -191,6 +217,17 @@ Widget left_button_array(
                       button_width: 35.0,
                       bgAlpha: 160),
                   const SizedBox(height: 10),
+                  single_circle_button(
+                      LucideIcons.hand,
+                      20.0,
+                      palmRejectionEnabled ? 90 : 40,
+                      palmRejectionEnabled ? "palm rejection on" : "palm rejection off",
+                      () => onTogglePalmRejection?.call(),
+                      context,
+                      screenWidth,
+                      button_width: 35.0,
+                      bgAlpha: 160),
+                  const SizedBox(height: 10),
                   if (selectedTool != DrawingTool.eraser2)
                     pen_further_options(context, screenWidth, currentPenColor, quickColors, onColorChanged, onOpenColorPicker),
                   const SizedBox(height: 10),
@@ -198,7 +235,7 @@ Widget left_button_array(
             ),
           )
       )
-  ) : SizedBox.shrink();
+  );
 }
 
 Widget color_button(Color color, VoidCallback onTap, {bool hasOutline = false}) {

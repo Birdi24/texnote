@@ -60,8 +60,9 @@ class CanvasViewState extends State<CanvasView> {
   final CanvasHistoryManager _historyManager = CanvasHistoryManager();
 
   Size? _lastScreenSize;
-  final Set<int> _activePointers = <int>{};
+  final Map<int, PointerDeviceKind> _activePointers = <int, PointerDeviceKind>{};
   bool _drawingSuspended = false;
+  bool _palmRejectionEnabled = true;
 
   DrawingTool _selectedTool = DrawingTool.pen;
   DrawingTool _lastPenEraserTool = DrawingTool.pen;
@@ -298,35 +299,52 @@ class CanvasViewState extends State<CanvasView> {
     }
   }
 
+  void _togglePalmRejection() {
+    setState(() {
+      _palmRejectionEnabled = !_palmRejectionEnabled;
+    });
+  }
+
   void _onPointerDown(PointerDownEvent event) {
     _handleStylusPointer(event);
 
-    if (_activePointers.isEmpty) {
-      _drawingSuspended = false;
-    }
-    _activePointers.add(event.pointer);
+    _activePointers[event.pointer] = event.kind;
 
-    // If first touch is outside page area, suspend drawing to allow one-finger panning
-    if (_activePointers.length == 1 && _lastScreenSize != null) {
-      final zoom = _transformationController.zoom;
-      final scale = _transformationController.scale;
-      final offset = _transformationController.offset;
+    if (_palmRejectionEnabled) {
+      final bool hasTouchPointer = _activePointers.values.contains(PointerDeviceKind.touch);
+      final bool hasMultiplePointers = _activePointers.length >= 2;
 
-      final pageRect = Rect.fromLTWH(
-        offset.dx,
-        offset.dy,
-        _pageWidth * scale,
-        _pageHeight * scale,
-      );
-
-      if (!pageRect.contains(event.localPosition)) {
+      if (hasTouchPointer || hasMultiplePointers) {
         _drawingSuspended = true;
+        widget.topCanvasKey.currentState?.cancelCurrentStroke();
+      } else {
+        _drawingSuspended = false;
       }
-    }
+    } else {
+      // If first touch is outside page area, suspend drawing to allow one-finger panning
+      if (_activePointers.length == 1 && _lastScreenSize != null) {
+        final zoom = _transformationController.zoom;
+        final scale = _transformationController.scale;
+        final offset = _transformationController.offset;
 
-    if (_activePointers.length >= 2) {
-      _drawingSuspended = true;
-      widget.topCanvasKey.currentState?.cancelCurrentStroke();
+        final pageRect = Rect.fromLTWH(
+          offset.dx,
+          offset.dy,
+          _pageWidth * scale,
+          _pageHeight * scale,
+        );
+
+        if (!pageRect.contains(event.localPosition)) {
+          _drawingSuspended = true;
+        } else {
+          _drawingSuspended = false;
+        }
+      }
+
+      if (_activePointers.length >= 2) {
+        _drawingSuspended = true;
+        widget.topCanvasKey.currentState?.cancelCurrentStroke();
+      }
     }
   }
 
@@ -337,16 +355,42 @@ class CanvasViewState extends State<CanvasView> {
   void _onPointerUp(PointerEvent event) {
     _handleStylusPointerUp(event);
     _activePointers.remove(event.pointer);
-    if (_activePointers.length < 2) {
+
+    if (_activePointers.isEmpty) {
       _drawingSuspended = false;
+    } else if (_palmRejectionEnabled) {
+      final bool hasTouchPointer = _activePointers.values.contains(PointerDeviceKind.touch);
+      final bool hasMultiplePointers = _activePointers.length >= 2;
+      if (hasTouchPointer || hasMultiplePointers) {
+        _drawingSuspended = true;
+      } else {
+        _drawingSuspended = false;
+      }
+    } else {
+      if (_activePointers.length < 2) {
+        _drawingSuspended = false;
+      }
     }
   }
 
-  void _onPointerCancel(PointerCancelEvent event) {
+  void _onPointerCancel(PointerEvent event) {
     _handleStylusPointerUp(event);
     _activePointers.remove(event.pointer);
-    if (_activePointers.length < 2) {
+
+    if (_activePointers.isEmpty) {
       _drawingSuspended = false;
+    } else if (_palmRejectionEnabled) {
+      final bool hasTouchPointer = _activePointers.values.contains(PointerDeviceKind.touch);
+      final bool hasMultiplePointers = _activePointers.length >= 2;
+      if (hasTouchPointer || hasMultiplePointers) {
+        _drawingSuspended = true;
+      } else {
+        _drawingSuspended = false;
+      }
+    } else {
+      if (_activePointers.length < 2) {
+        _drawingSuspended = false;
+      }
     }
   }
 
@@ -408,11 +452,6 @@ class CanvasViewState extends State<CanvasView> {
   }
 
   void _onToolChanged(DrawingTool tool) {
-    if (tool == DrawingTool.duplicate) {
-      widget.topCanvasKey.currentState?.setTool(tool);
-      return;
-    }
-
     setState(() {
       _selectedTool = tool;
 
@@ -948,8 +987,6 @@ class CanvasViewState extends State<CanvasView> {
                         90,
                         "back",
                             () {
-                          // Just trigger a pop request. PopScope in HandwrittenNotePage will handle saving if needed.
-
                               widget.onBack?.call();
                         },
                         context,
@@ -975,6 +1012,8 @@ class CanvasViewState extends State<CanvasView> {
                         onToolChanged: _onToolChanged,
                         onAddPage: () => _addPage(viewportSize),
                         onImportImage: _handleImportImage,
+                        palmRejectionEnabled: _palmRejectionEnabled,
+                        onTogglePalmRejection: _togglePalmRejection,
                       ),
                     )
                         : Positioned(
@@ -1001,6 +1040,8 @@ class CanvasViewState extends State<CanvasView> {
                           onToolChanged: _onToolChanged,
                           onAddPage: () => _addPage(viewportSize),
                           onImportImage: _handleImportImage,
+                          palmRejectionEnabled: _palmRejectionEnabled,
+                          onTogglePalmRejection: _togglePalmRejection,
                         ),
                       )
                           : const SizedBox.shrink(),
@@ -1035,6 +1076,8 @@ class CanvasViewState extends State<CanvasView> {
                                 ],
                           onColorChanged: _onColorChanged,
                           onOpenColorPicker: () => setState(() => _showColorPicker = !_showColorPicker),
+                          palmRejectionEnabled: _palmRejectionEnabled,
+                          onTogglePalmRejection: _togglePalmRejection,
                         ),
                       ),
                     )
@@ -1089,20 +1132,39 @@ class CanvasViewState extends State<CanvasView> {
                     Positioned(
                       bottom: 10,
                       left: 10,
-                      child: single_circle_button(
-                        show_all_buttons ? LucideIcons.maximize : LucideIcons.minimize,
-                        20,
-                        90,
-                        "minimize/maximize",
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          single_circle_button(
+                            show_all_buttons ? LucideIcons.maximize : LucideIcons.minimize,
+                            20,
+                            90,
+                            "minimize/maximize",
                             () {
-                          setState(() {
-                            show_all_buttons = !show_all_buttons;
-                          });
-                        },
-                        context,
-                        screenSize.width,
-                        button_width: 50,
-                        bgAlpha: 255,
+                              setState(() {
+                                show_all_buttons = !show_all_buttons;
+                              });
+                            },
+                            context,
+                            screenSize.width,
+                            button_width: 50,
+                            bgAlpha: 255,
+                          ),
+                          if (!show_all_buttons) ...[
+                            const SizedBox(width: 10),
+                            single_circle_button(
+                              LucideIcons.file_plus,
+                              20,
+                              90,
+                              "add page",
+                              () => _addPage(viewportSize),
+                              context,
+                              screenSize.width,
+                              button_width: 50,
+                              bgAlpha: 255,
+                            ),
+                          ],
+                        ],
                       ),
                     )
                   ],

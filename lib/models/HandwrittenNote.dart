@@ -527,7 +527,7 @@ class HandwrittenNote extends Note {
         // Pre-render background if it's a PDF page
         pw.MemoryImage? bgImage;
         final bg = pageObj.background;
-        PdfPageFormat pageFormat = PdfPageFormat.a4;
+        PdfPageFormat pageFormat = PdfPageFormat(logicalPageWidth, logicalPageHeight);
 
         if (bg != null) {
           if (bg.startsWith("pdf_page:")) {
@@ -541,9 +541,6 @@ class HandwrittenNote extends Note {
                   format: px.PdfPageImageFormat.jpeg,
                 );
                 if (img != null) bgImage = pw.MemoryImage(img.bytes);
-
-                // Match exported PDF page format to the source PDF page size
-                pageFormat = PdfPageFormat(page.width.toDouble(), page.height.toDouble());
                 await page.close();
               } catch (e) {
                 debugPrint("Error rendering PDF page for export: $e");
@@ -559,7 +556,6 @@ class HandwrittenNote extends Note {
                   final codec = await ui.instantiateImageCodec(bytes);
                   final frameInfo = await codec.getNextFrame();
                   final decodedImage = frameInfo.image;
-                  pageFormat = PdfPageFormat(decodedImage.width.toDouble(), decodedImage.height.toDouble());
                   decodedImage.dispose();
                   codec.dispose();
                 } catch (e) {

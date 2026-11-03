@@ -75,6 +75,23 @@ class Stroke {
     );
   }
 
+  /// returns a copy of the stroke with optional overridden properties
+  Stroke copyWith({
+    List<Offset>? points,
+    double? size,
+    Color? color,
+    bool? hasStartCap,
+    bool? hasEndCap,
+  }) {
+    return Stroke(
+      points: points ?? List.from(this.points),
+      size: size ?? this.size,
+      color: color ?? this.color,
+      hasStartCap: hasStartCap ?? this.hasStartCap,
+      hasEndCap: hasEndCap ?? this.hasEndCap,
+    );
+  }
+
   /// clear the cache of the stroke
   void invalidateCache() => _cachedPath = null;
 

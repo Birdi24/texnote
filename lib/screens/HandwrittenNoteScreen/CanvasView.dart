@@ -209,9 +209,9 @@ class CanvasViewState extends State<CanvasView> {
 
   int _computeCurrentPage() {
     if (_basePageHeight == 0 || _lastScreenSize == null) return 0;
-    final zoom = _transformationController.zoom;
-    final scrollY = -_transformationController.offset.dy / zoom;
-    final viewportCenterY = scrollY + (_lastScreenSize!.height / 2) / zoom;
+    final scale = _transformationController.scale;
+    final scrollY = -_transformationController.offset.dy / scale;
+    final viewportCenterY = scrollY + (_lastScreenSize!.height / 2) / scale;
 
     final page = (viewportCenterY / _basePageHeight).floor();
     return page.clamp(0, _numPages - 1);
@@ -259,15 +259,21 @@ class CanvasViewState extends State<CanvasView> {
 
   void _initializeFit(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    _basePageHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
-    _pageWidth = _basePageHeight * .707;
+    final safeWidth = mediaQuery.size.width;
+    final safeHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+
+    _basePageHeight = HandwrittenNote.logicalPageHeight;
+    _pageWidth = HandwrittenNote.logicalPageWidth;
 
     _numPages = widget.pages.length;
     _pageHeight = _basePageHeight * _numPages;
 
+    final double fitScale = safeHeight > 0 ? (safeHeight / (1.25 * _basePageHeight)) : 1.0;
+
     _transformationController.initialize(
       pageWidth: _pageWidth,
-      viewportWidth: mediaQuery.size.width,
+      viewportWidth: safeWidth,
+      referenceScale: fitScale,
     );
   }
 
@@ -323,7 +329,6 @@ class CanvasViewState extends State<CanvasView> {
     } else {
       // If first touch is outside page area, suspend drawing to allow one-finger panning
       if (_activePointers.length == 1 && _lastScreenSize != null) {
-        final zoom = _transformationController.zoom;
         final scale = _transformationController.scale;
         final offset = _transformationController.offset;
 
@@ -427,12 +432,12 @@ class CanvasViewState extends State<CanvasView> {
       final String newPath = p.join(imagesDir.path, fileName);
       await File(image.path).copy(newPath);
 
-      final zoom = _transformationController.zoom;
+      final scale = _transformationController.scale;
       final offset = _transformationController.offset;
       final viewportSize = _lastScreenSize ?? Size.zero;
 
-      final centerX = (-offset.dx + viewportSize.width / 2) / zoom;
-      final centerY = (-offset.dy + viewportSize.height / 2) / zoom;
+      final centerX = (-offset.dx + viewportSize.width / 2) / scale;
+      final centerY = (-offset.dy + viewportSize.height / 2) / scale;
       
       final int pageIdx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
       final relativePos = Offset(centerX - 100, (centerY - 100) - (pageIdx * _basePageHeight));
@@ -806,12 +811,14 @@ class CanvasViewState extends State<CanvasView> {
         final viewportSize = Size(safeWidth, safeHeight);
 
         if (_basePageHeight <= 0) {
-           _basePageHeight = safeHeight;
-           _pageWidth = _basePageHeight * .707;
+           _basePageHeight = HandwrittenNote.logicalPageHeight;
+           _pageWidth = HandwrittenNote.logicalPageWidth;
            _pageHeight = _basePageHeight * widget.pages.length;
+           final double fitScale = safeHeight > 0 ? (safeHeight / (1.25 * _basePageHeight)) : 1.0;
            _transformationController.initialize(
               pageWidth: _pageWidth,
               viewportWidth: safeWidth,
+              referenceScale: fitScale,
            );
         }
 

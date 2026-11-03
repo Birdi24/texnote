@@ -35,7 +35,7 @@ class CanvasTransformationController extends ChangeNotifier {
   }) {
     _referenceScale = referenceScale;
     _zoom = 1.0;
-    _offset = Offset((viewportWidth - pageWidth) / 2, 0);
+    _offset = Offset((viewportWidth - pageWidth * referenceScale) / 2, 0);
     notifyListeners();
   }
 

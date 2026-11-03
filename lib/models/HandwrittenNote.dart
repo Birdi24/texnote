@@ -85,10 +85,13 @@ class NotePage {
 }
 
 class HandwrittenNote extends Note {
+
   String cover = "1";
   String paperType = "blank";
   List<NotePage> pages = [];
   String pdfSourcePath;
+  static const double logicalPageWidth = 840.0;
+  static const double logicalPageHeight = 1188.0;
 
   HandwrittenNote({
     required super.title,
@@ -512,8 +515,8 @@ class HandwrittenNote extends Note {
     try {
       final pdf = pw.Document();
 
-      const double logicalPageHeight = 1188.0;
-      const double logicalPageWidth = 840.0;
+      const double targetPageHeight = HandwrittenNote.logicalPageHeight;
+      const double targetPageWidth = HandwrittenNote.logicalPageWidth;
 
       if (pdfSourcePath.isNotEmpty) {
         try {
@@ -527,7 +530,7 @@ class HandwrittenNote extends Note {
         // Pre-render background if it's a PDF page
         pw.MemoryImage? bgImage;
         final bg = pageObj.background;
-        PdfPageFormat pageFormat = PdfPageFormat(logicalPageWidth, logicalPageHeight);
+        PdfPageFormat pageFormat = PdfPageFormat(targetPageWidth, targetPageHeight);
 
         if (bg != null) {
           if (bg.startsWith("pdf_page:")) {
@@ -568,8 +571,34 @@ class HandwrittenNote extends Note {
           }
         }
 
-        final scaleX = pageFormat.width / logicalPageWidth;
-        final scaleY = pageFormat.height / logicalPageHeight;
+        // Working dimensions for page content
+        double workingWidth = targetPageWidth;
+        double workingHeight = targetPageHeight;
+
+        // Gracefully handle legacy pages drawn on smaller or non-standard canvas sizes
+        double maxContentX = 0;
+        double maxContentY = 0;
+        for (final s in pageObj.strokes) {
+          final bounds = s.getBounds();
+          if (bounds.right > maxContentX) maxContentX = bounds.right;
+          if (bounds.bottom > maxContentY) maxContentY = bounds.bottom;
+        }
+        for (final img in pageObj.images) {
+          final bounds = img.getBounds();
+          if (bounds.right > maxContentX) maxContentX = bounds.right;
+          if (bounds.bottom > maxContentY) maxContentY = bounds.bottom;
+        }
+        for (final txt in pageObj.texts) {
+          final bounds = txt.getBounds();
+          if (bounds.right > maxContentX) maxContentX = bounds.right;
+          if (bounds.bottom > maxContentY) maxContentY = bounds.bottom;
+        }
+
+        if (maxContentX > workingWidth) workingWidth = maxContentX;
+        if (maxContentY > workingHeight) workingHeight = maxContentY;
+
+        final scaleX = pageFormat.width / workingWidth;
+        final scaleY = pageFormat.height / workingHeight;
 
         pdf.addPage(
           pw.Page(
@@ -650,15 +679,16 @@ class HandwrittenNote extends Note {
                           }
 
                           // Strokes
-                          final strokeScaleX = size.x / logicalPageWidth;
-                          final strokeScaleY = size.y / logicalPageHeight;
+                          final strokeScaleX = size.x / workingWidth;
+                          final strokeScaleY = size.y / workingHeight;
+                          final strokeSizeScale = (strokeScaleX + strokeScaleY) / 2;
 
                           for (final stroke in pageObj.strokes) {
                             final freehandPoints = stroke.points.map((p) => PointVector(p.dx, p.dy, 0.5)).toList();
                             final outline = getStroke(
                               freehandPoints,
                               options: StrokeOptions(
-                                size: stroke.size,
+                                size: stroke.size * strokeSizeScale,
                                 thinning: 0.5,
                                 smoothing: 0.5,
                                 streamline: 0.5,

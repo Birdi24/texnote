@@ -4,7 +4,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
+import 'package:path_provider/path_provider.dart';
 import 'package:perfect_freehand/perfect_freehand.dart';
 import 'package:saf/saf.dart';
 import 'package:path/path.dart' as p;
@@ -38,7 +40,8 @@ class PageSource {
     );
   }
 
-  factory PageSource.pdf(int index) => PageSource(type: PageSourceType.pdf, originalIndex: index);
+  factory PageSource.pdf(int index) =>
+      PageSource(type: PageSourceType.pdf, originalIndex: index);
   factory PageSource.blank() => PageSource(type: PageSourceType.blank);
   factory PageSource.duplicate() => PageSource(type: PageSourceType.duplicate);
 }
@@ -58,10 +61,12 @@ class NotePage {
     List<TextData>? texts,
     this.background,
     required this.source,
-  })  : id = id ?? "${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(10000)}",
-        strokes = strokes ?? [],
-        images = images ?? [],
-        texts = texts ?? [];
+  }) : id =
+           id ??
+           "${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(10000)}",
+       strokes = strokes ?? [],
+       images = images ?? [],
+       texts = texts ?? [];
 
   Map<String, dynamic> toMap() => {
     'id': id,
@@ -75,9 +80,15 @@ class NotePage {
   factory NotePage.fromMap(Map<String, dynamic> map) {
     return NotePage(
       id: map['id'] as String?,
-      strokes: (map['strokes'] as List?)?.map((s) => Stroke.fromMap(s as Map<String, dynamic>)).toList(),
-      images: (map['images'] as List?)?.map((i) => ImageData.fromMap(i as Map<String, dynamic>)).toList(),
-      texts: (map['texts'] as List?)?.map((t) => TextData.fromMap(t as Map<String, dynamic>)).toList(),
+      strokes: (map['strokes'] as List?)
+          ?.map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+          .toList(),
+      images: (map['images'] as List?)
+          ?.map((i) => ImageData.fromMap(i as Map<String, dynamic>))
+          .toList(),
+      texts: (map['texts'] as List?)
+          ?.map((t) => TextData.fromMap(t as Map<String, dynamic>))
+          .toList(),
       background: map['background'] as String?,
       source: PageSource.fromMap(map['source'] as Map<String, dynamic>),
     );
@@ -85,7 +96,6 @@ class NotePage {
 }
 
 class HandwrittenNote extends Note {
-
   String cover = "1";
   String paperType = "blank";
   List<NotePage> pages = [];
@@ -129,7 +139,9 @@ class HandwrittenNote extends Note {
         'finalTime': finalTime,
       });
 
-      debugPrint("HandwrittenNote.load(): Loaded '${note.title}' with ${note.pages.length} pages");
+      debugPrint(
+        "HandwrittenNote.load(): Loaded '${note.title}' with ${note.pages.length} pages",
+      );
       return note;
     }
     throw Exception("File does not exist at $path");
@@ -159,16 +171,28 @@ class HandwrittenNote extends Note {
     } else {
       // MIGRATION: Old flat format
       debugPrint("Migrating legacy flat HandwrittenNote: $title");
-      
+
       const double logicalPageHeight = 1188.0;
-      final List<String?> pageBackgrounds = (data['pageBackgrounds'] as List<dynamic>?)?.map((e) => e?.toString()).toList() ?? [];
-      final List<Stroke> strokes = (data['strokes'] as List?)
-          ?.map((s) => Stroke.fromMap(s as Map<String, dynamic>))
-          .toList() ?? [];
-      final List<ImageData> images = (data['images'] as List?)
-          ?.map((e) => ImageData.fromMap(e as Map<String, dynamic>)).toList() ?? [];
-      final List<TextData> texts = (data['texts'] as List?)
-          ?.map((e) => TextData.fromMap(e as Map<String, dynamic>)).toList() ?? [];
+      final List<String?> pageBackgrounds =
+          (data['pageBackgrounds'] as List<dynamic>?)
+              ?.map((e) => e?.toString())
+              .toList() ??
+          [];
+      final List<Stroke> strokes =
+          (data['strokes'] as List?)
+              ?.map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+              .toList() ??
+          [];
+      final List<ImageData> images =
+          (data['images'] as List?)
+              ?.map((e) => ImageData.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [];
+      final List<TextData> texts =
+          (data['texts'] as List?)
+              ?.map((e) => TextData.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [];
 
       int numPages = pageBackgrounds.length;
       if (numPages == 0) {
@@ -184,7 +208,7 @@ class HandwrittenNote extends Note {
       note.pages = List.generate(numPages, (i) {
         final pageStartY = i * logicalPageHeight;
         final pageEndY = (i + 1) * logicalPageHeight;
-        
+
         String? bg = pageBackgrounds.length > i ? pageBackgrounds[i] : null;
         PageSource source;
         if (bg != null && bg.startsWith("pdf_page:")) {
@@ -195,7 +219,8 @@ class HandwrittenNote extends Note {
           if (match != null) {
             int pageNum = int.parse(match.group(1)!);
             source = PageSource.pdf(pageNum);
-            bg = "pdf_page:$pageNum"; // Convert back to marker to force new cache usage
+            bg =
+                "pdf_page:$pageNum"; // Convert back to marker to force new cache usage
           } else {
             source = PageSource.blank();
           }
@@ -203,20 +228,29 @@ class HandwrittenNote extends Note {
           source = PageSource.blank();
         }
 
-        final pageStrokes = strokes.where((s) {
-          final centerY = s.getBounds().center.dy;
-          return centerY >= pageStartY && centerY < pageEndY;
-        }).map((s) => s.translate(Offset(0, -pageStartY))).toList();
+        final pageStrokes = strokes
+            .where((s) {
+              final centerY = s.getBounds().center.dy;
+              return centerY >= pageStartY && centerY < pageEndY;
+            })
+            .map((s) => s.translate(Offset(0, -pageStartY)))
+            .toList();
 
-        final pageImages = images.where((img) {
-          final centerY = img.getBounds().center.dy;
-          return centerY >= pageStartY && centerY < pageEndY;
-        }).map((img) => img.translate(Offset(0, -pageStartY))).toList();
+        final pageImages = images
+            .where((img) {
+              final centerY = img.getBounds().center.dy;
+              return centerY >= pageStartY && centerY < pageEndY;
+            })
+            .map((img) => img.translate(Offset(0, -pageStartY)))
+            .toList();
 
-        final pageTexts = texts.where((txt) {
-          final centerY = txt.getBounds().center.dy;
-          return centerY >= pageStartY && centerY < pageEndY;
-        }).map((txt) => txt.translate(Offset(0, -pageStartY))).toList();
+        final pageTexts = texts
+            .where((txt) {
+              final centerY = txt.getBounds().center.dy;
+              return centerY >= pageStartY && centerY < pageEndY;
+            })
+            .map((txt) => txt.translate(Offset(0, -pageStartY)))
+            .toList();
 
         return NotePage(
           strokes: pageStrokes,
@@ -236,9 +270,9 @@ class HandwrittenNote extends Note {
   Future<void> move_to(String targetDirectory) async {
     final oldPath = path;
     final oldPdfPath = pdfSourcePath;
-    
+
     await super.move_to(targetDirectory);
-    
+
     // If the PDF is a separate file in the same directory, move it too.
     // Avoid double-moving if path and pdfSourcePath were the same (raw PDF case).
     if (oldPdfPath.isNotEmpty && oldPdfPath != oldPath) {
@@ -264,7 +298,8 @@ class HandwrittenNote extends Note {
     final newPdfPath = p.join(directoryPath, '${newTitle}_bg.pdf');
 
     // Check if we need to regenerate
-    bool needsUpdate = !File(newPdfPath).existsSync() || pdfSourcePath != newPdfPath;
+    bool needsUpdate =
+        !File(newPdfPath).existsSync() || pdfSourcePath != newPdfPath;
     if (!needsUpdate) return;
 
     debugPrint("Syncing PDF background to $newPdfPath");
@@ -284,12 +319,16 @@ class HandwrittenNote extends Note {
 
   @override
   Future<void> save(String oldTitle) async {
-    debugPrint("HandwrittenNote.save(oldTitle: '$oldTitle') started for '$title'");
+    debugPrint(
+      "HandwrittenNote.save(oldTitle: '$oldTitle') started for '$title'",
+    );
     try {
       String newTitle = sanitizeFileName(title.trim());
 
       if (newTitle.isEmpty) {
-        newTitle = sanitizeFileName(DateFormat('h:mm a - MMM d, yyyy').format(DateTime.now()));
+        newTitle = sanitizeFileName(
+          DateFormat('h:mm a - MMM d, yyyy').format(DateTime.now()),
+        );
       }
 
       if (path.startsWith('content://')) {
@@ -316,9 +355,7 @@ class HandwrittenNote extends Note {
           debugPrint("New URI: $path");
         }
 
-        final existingFile = await saf.stat(
-            uri.toString()
-        );
+        final existingFile = await saf.stat(uri.toString());
 
         if (existingFile == null) {
           throw Exception("Could not find imported file.");
@@ -380,12 +417,13 @@ class HandwrittenNote extends Note {
       path = p.canonicalize(file.path);
       date = DateTime.now();
 
-      debugPrint("HandwrittenNote.save(): Saved to ${file.path}. Path updated to $path");
+      debugPrint(
+        "HandwrittenNote.save(): Saved to ${file.path}. Path updated to $path",
+      );
     } catch (e) {
       debugPrint("Error saving note: $e");
     }
   }
-
 
   @override
   Future<Note> duplicate_note() async {
@@ -401,14 +439,21 @@ class HandwrittenNote extends Note {
       final file = File(newPath);
       await file.writeAsString(get_json());
 
-      List<NotePage> duplicatedPages = pages.map((page) => NotePage(
-        id: "${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(10000)}",
-        strokes: page.strokes.map((s) => s.copy()).toList(),
-        images: page.images.map((i) => i.copy()).toList(),
-        texts: page.texts.map((t) => t.copy()).toList(),
-        background: page.background,
-        source: PageSource(type: page.source.type, originalIndex: page.source.originalIndex),
-      )).toList();
+      List<NotePage> duplicatedPages = pages
+          .map(
+            (page) => NotePage(
+              id: "${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(10000)}",
+              strokes: page.strokes.map((s) => s.copy()).toList(),
+              images: page.images.map((i) => i.copy()).toList(),
+              texts: page.texts.map((t) => t.copy()).toList(),
+              background: page.background,
+              source: PageSource(
+                type: page.source.type,
+                originalIndex: page.source.originalIndex,
+              ),
+            ),
+          )
+          .toList();
 
       HandwrittenNote dup = HandwrittenNote(
         title: "$title-Copy",
@@ -423,7 +468,12 @@ class HandwrittenNote extends Note {
       return dup;
     } catch (e) {
       debugPrint("Error duplicating note: $e");
-      return HandwrittenNote(title: "INVALID", type: type, date: date, path: path);
+      return HandwrittenNote(
+        title: "INVALID",
+        type: type,
+        date: date,
+        path: path,
+      );
     }
   }
 
@@ -435,60 +485,63 @@ class HandwrittenNote extends Note {
         color: Colors.transparent,
         child: Column(
           children: [
-          AspectRatio(aspectRatio: 0.72, child :Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: collection_color(cover),
-            border: Border.all(
-              color: icon_color,
-              width: 1,
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                top: 0, left: 0, bottom: 0, width: 16,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                  ),
-                  child: ColoredBox(color: BLACK.withAlpha(25)),
+            AspectRatio(
+              aspectRatio: 0.72,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: collection_color(cover),
+                  border: Border.all(color: icon_color, width: 1),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      bottom: 0,
+                      width: 16,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          bottomLeft: Radius.circular(20),
+                        ),
+                        child: ColoredBox(color: BLACK.withAlpha(25)),
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 16,
+                      bottom: 0,
+                      width: 2,
+                      child: ColoredBox(color: WHITE.withAlpha(50)),
+                    ),
+                  ],
                 ),
               ),
-              Positioned(
-                  top: 0, left: 16, bottom: 0, width: 2,
-                  child: ColoredBox(color: WHITE.withAlpha(50))
-              )
-            ],
-          )
-        )),
+            ),
 
-        const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: icon_color,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: icon_color,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
 
-        const SizedBox(height: 3),
+            const SizedBox(height: 3),
 
-        Text(
-          date_string(),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-          style: TextStyle(
-            color: accent,
-            fontSize: 12,
-          ),
-        ),
+            Text(
+              date_string(),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: TextStyle(color: accent, fontSize: 12),
+            ),
           ],
         ),
       ),
@@ -536,7 +589,10 @@ class HandwrittenNote extends Note {
         // Pre-render background if it's a PDF page
         pw.MemoryImage? bgImage;
         final bg = pageObj.background;
-        PdfPageFormat pageFormat = PdfPageFormat(targetPageWidth, targetPageHeight);
+        PdfPageFormat pageFormat = PdfPageFormat(
+          targetPageWidth,
+          targetPageHeight,
+        );
 
         if (bg != null) {
           if (bg.startsWith("pdf_page:")) {
@@ -617,10 +673,7 @@ class HandwrittenNote extends Note {
                     // Background Image
                     if (bgImage != null)
                       pw.Positioned.fill(
-                        child: pw.Image(
-                          bgImage,
-                          fit: pw.BoxFit.fill,
-                        ),
+                        child: pw.Image(bgImage, fit: pw.BoxFit.fill),
                       ),
 
                     // User-added Images
@@ -665,7 +718,12 @@ class HandwrittenNote extends Note {
                             canvas.setLineWidth(0.5);
                             if (paperType == "lined") {
                               for (double y = 30; y < size.y; y += 30) {
-                                canvas.drawLine(0, size.y - y, size.x, size.y - y);
+                                canvas.drawLine(
+                                  0,
+                                  size.y - y,
+                                  size.x,
+                                  size.y - y,
+                                );
                               }
                             } else if (paperType == "dot-grid") {
                               for (double x = 25; x < size.x; x += 25) {
@@ -678,7 +736,12 @@ class HandwrittenNote extends Note {
                                 canvas.drawLine(x, 0, x, size.y);
                               }
                               for (double y = 25; y < size.y; y += 25) {
-                                canvas.drawLine(0, size.y - y, size.x, size.y - y);
+                                canvas.drawLine(
+                                  0,
+                                  size.y - y,
+                                  size.x,
+                                  size.y - y,
+                                );
                               }
                             }
                             canvas.strokePath();
@@ -687,10 +750,13 @@ class HandwrittenNote extends Note {
                           // Strokes
                           final strokeScaleX = size.x / workingWidth;
                           final strokeScaleY = size.y / workingHeight;
-                          final strokeSizeScale = (strokeScaleX + strokeScaleY) / 2;
+                          final strokeSizeScale =
+                              (strokeScaleX + strokeScaleY) / 2;
 
                           for (final stroke in pageObj.strokes) {
-                            final freehandPoints = stroke.points.map((p) => PointVector(p.dx, p.dy, 0.5)).toList();
+                            final freehandPoints = stroke.points
+                                .map((p) => PointVector(p.dx, p.dy, 0.5))
+                                .toList();
                             final outline = getStroke(
                               freehandPoints,
                               options: StrokeOptions(
@@ -711,13 +777,24 @@ class HandwrittenNote extends Note {
                             );
 
                             if (outline.isNotEmpty) {
-                              canvas.moveTo(outline.first.dx * strokeScaleX, size.y - outline.first.dy * strokeScaleY);
+                              canvas.moveTo(
+                                outline.first.dx * strokeScaleX,
+                                size.y - outline.first.dy * strokeScaleY,
+                              );
                               for (final p in outline.skip(1)) {
-                                canvas.lineTo(p.dx * strokeScaleX, size.y - p.dy * strokeScaleY);
+                                canvas.lineTo(
+                                  p.dx * strokeScaleX,
+                                  size.y - p.dy * strokeScaleY,
+                                );
                               }
                               canvas.closePath();
-                              final adaptiveColor = getAdaptiveStrokeColor(stroke.color, WHITE);
-                              canvas.setFillColor(PdfColor.fromInt(adaptiveColor.toARGB32()));
+                              final adaptiveColor = getAdaptiveStrokeColor(
+                                stroke.color,
+                                WHITE,
+                              );
+                              canvas.setFillColor(
+                                PdfColor.fromInt(adaptiveColor.toARGB32()),
+                              );
                               canvas.fillPath();
                             }
                           }
@@ -732,18 +809,29 @@ class HandwrittenNote extends Note {
         );
       }
 
-      final saf = Saf();
-      final dir = await saf.pickDirectory();
-      if (dir == null) return;
-
       final bytes = await pdf.save();
+      if (!Platform.isAndroid) {
+        throw UnsupportedError('PDF export is only supported on Android.');
+      }
 
-      await saf.writeFileBytes(
-        dir.uri,
-        '$title.pdf',
-        'application/pdf',
-        bytes,
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(
+        p.join(
+          tempDir.path,
+          'handwritten-export-${DateTime.now().microsecondsSinceEpoch}.pdf',
+        ),
       );
+      try {
+        await tempFile.writeAsBytes(bytes, flush: true);
+        await const MethodChannel(
+          'com.example.birdwrite/intent',
+        ).invokeMethod<bool>('savePdf', {
+          'path': tempFile.path,
+          'fileName': '$title.pdf',
+        });
+      } finally {
+        if (await tempFile.exists()) await tempFile.delete();
+      }
     } catch (e) {
       debugPrint("Error exporting PDF: $e");
     } finally {

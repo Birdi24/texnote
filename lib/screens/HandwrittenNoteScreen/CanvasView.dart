@@ -27,7 +27,12 @@ import '../../models/HandwrittenNote.dart';
 
 class CanvasView extends StatefulWidget {
   final List<NotePage> pages;
-  final void Function(List<Stroke> strokes, List<ImageData> images, List<TextData> texts) onCommit;
+  final void Function(
+    List<Stroke> strokes,
+    List<ImageData> images,
+    List<TextData> texts,
+  )
+  onCommit;
   final GlobalKey<TopCanvasState> topCanvasKey;
   final Future<void> Function() onSave;
   final bool changed;
@@ -36,6 +41,7 @@ class CanvasView extends StatefulWidget {
   final PageBackgroundResolver? resolvePageBackground;
   final ValueChanged<int>? onPageChanged;
   final Future<void> Function()? onBack;
+  final Future<void> Function()? onExportPdf;
 
   const CanvasView({
     super.key,
@@ -49,6 +55,7 @@ class CanvasView extends StatefulWidget {
     required this.resolvePageBackground,
     required this.onPageChanged,
     this.onBack, // NEW
+    this.onExportPdf,
   });
 
   @override
@@ -56,12 +63,14 @@ class CanvasView extends StatefulWidget {
 }
 
 class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
-  final CanvasTransformationController _transformationController = CanvasTransformationController();
+  final CanvasTransformationController _transformationController =
+      CanvasTransformationController();
   final CanvasHistoryManager _historyManager = CanvasHistoryManager();
   AnimationController? _scrollAnimationController;
 
   Size? _lastScreenSize;
-  final Map<int, PointerDeviceKind> _activePointers = <int, PointerDeviceKind>{};
+  final Map<int, PointerDeviceKind> _activePointers =
+      <int, PointerDeviceKind>{};
   bool _drawingSuspended = false;
   bool _palmRejectionEnabled = true;
 
@@ -115,12 +124,13 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    _pageManagerSlideAnimation = Tween<Offset>(
-      begin: const Offset(1.0, 0.0),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _pageManagerController, curve: Curves.easeInOut),
-    );
+    _pageManagerSlideAnimation =
+        Tween<Offset>(begin: const Offset(1.0, 0.0), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _pageManagerController,
+            curve: Curves.easeInOut,
+          ),
+        );
 
     _transformationController.addListener(_onTransformationChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -214,7 +224,10 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
   }
 
   Future<void> _updateThumbnailCache(int pageIndex) async {
-    if (_basePageHeight <= 0 || _pageWidth <= 0 || pageIndex >= widget.pages.length) return;
+    if (_basePageHeight <= 0 ||
+        _pageWidth <= 0 ||
+        pageIndex >= widget.pages.length)
+      return;
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -252,7 +265,10 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     imageCanvas.scale(scale, scale);
     imageCanvas.drawPicture(picture);
     final scaledPicture = imageRecorder.endRecording();
-    final newImage = await scaledPicture.toImage(thumbnailWidth.toInt(), thumbnailHeight);
+    final newImage = await scaledPicture.toImage(
+      thumbnailWidth.toInt(),
+      thumbnailHeight,
+    );
     if (mounted) {
       setState(() {
         final oldImage = _thumbnailCache[page.id];
@@ -273,7 +289,6 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       widget.onPageChanged?.call(page);
     }
   }
-
 
   int _computeCurrentPage() {
     if (_basePageHeight == 0 || _lastScreenSize == null) return 0;
@@ -305,14 +320,23 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     _pageHeight = _basePageHeight * _numPages;
 
     widget.pages.clear();
-    widget.pages.addAll(state.pages.map((page) => NotePage(
-      id: page.id,
-      strokes: page.strokes.map((s) => s.copy()).toList(),
-      images: page.images.map((i) => i.copy()).toList(),
-      texts: page.texts.map((t) => t.copy()).toList(),
-      background: page.background,
-      source: PageSource(type: page.source.type, originalIndex: page.source.originalIndex),
-    )).toList());
+    widget.pages.addAll(
+      state.pages
+          .map(
+            (page) => NotePage(
+              id: page.id,
+              strokes: page.strokes.map((s) => s.copy()).toList(),
+              images: page.images.map((i) => i.copy()).toList(),
+              texts: page.texts.map((t) => t.copy()).toList(),
+              background: page.background,
+              source: PageSource(
+                type: page.source.type,
+                originalIndex: page.source.originalIndex,
+              ),
+            ),
+          )
+          .toList(),
+    );
 
     _recomputeContentBounds();
     _clearThumbnailCache();
@@ -320,15 +344,24 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       _updateThumbnailCache(i);
     }
 
-    widget.topCanvasKey.currentState?.setStrokes(state.topLayer.map((s) => s.copy()).toList());
-    widget.topCanvasKey.currentState?.setImages((state.topImages).map((i) => i.copy()).toList());
-    widget.topCanvasKey.currentState?.setTexts((state.topTexts).map((t) => t.copy()).toList());
+    widget.topCanvasKey.currentState?.setStrokes(
+      state.topLayer.map((s) => s.copy()).toList(),
+    );
+    widget.topCanvasKey.currentState?.setImages(
+      (state.topImages).map((i) => i.copy()).toList(),
+    );
+    widget.topCanvasKey.currentState?.setTexts(
+      (state.topTexts).map((t) => t.copy()).toList(),
+    );
   }
 
   void _initializeFit(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final safeWidth = mediaQuery.size.width;
-    final safeHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+    final safeHeight =
+        mediaQuery.size.height -
+        mediaQuery.padding.top -
+        mediaQuery.padding.bottom;
 
     _basePageHeight = HandwrittenNote.logicalPageHeight;
     _pageWidth = HandwrittenNote.logicalPageWidth;
@@ -336,7 +369,9 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     _numPages = widget.pages.length;
     _pageHeight = _basePageHeight * _numPages;
 
-    final double fitScale = safeHeight > 0 ? (safeHeight / (1.25 * _basePageHeight)) : 1.0;
+    final double fitScale = safeHeight > 0
+        ? (safeHeight / (1.25 * _basePageHeight))
+        : 1.0;
 
     _transformationController.initialize(
       pageWidth: _pageWidth,
@@ -354,7 +389,8 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     _previousStylusButtons = buttonPressed ? event.buttons : 0;
     if (!newButtonPress) return;
 
-    if (_selectedTool == DrawingTool.pen || _selectedTool == DrawingTool.highlighter) {
+    if (_selectedTool == DrawingTool.pen ||
+        _selectedTool == DrawingTool.highlighter) {
       _lastPenEraserTool = _selectedTool;
       _onToolChanged(DrawingTool.eraser2);
     } else if (_selectedTool == DrawingTool.eraser2) {
@@ -385,7 +421,9 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     _activePointers[event.pointer] = event.kind;
 
     if (_palmRejectionEnabled) {
-      final bool hasTouchPointer = _activePointers.values.contains(PointerDeviceKind.touch);
+      final bool hasTouchPointer = _activePointers.values.contains(
+        PointerDeviceKind.touch,
+      );
       final bool hasMultiplePointers = _activePointers.length >= 2;
 
       if (hasTouchPointer || hasMultiplePointers) {
@@ -432,7 +470,9 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     if (_activePointers.isEmpty) {
       _drawingSuspended = false;
     } else if (_palmRejectionEnabled) {
-      final bool hasTouchPointer = _activePointers.values.contains(PointerDeviceKind.touch);
+      final bool hasTouchPointer = _activePointers.values.contains(
+        PointerDeviceKind.touch,
+      );
       final bool hasMultiplePointers = _activePointers.length >= 2;
       if (hasTouchPointer || hasMultiplePointers) {
         _drawingSuspended = true;
@@ -453,7 +493,9 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     if (_activePointers.isEmpty) {
       _drawingSuspended = false;
     } else if (_palmRejectionEnabled) {
-      final bool hasTouchPointer = _activePointers.values.contains(PointerDeviceKind.touch);
+      final bool hasTouchPointer = _activePointers.values.contains(
+        PointerDeviceKind.touch,
+      );
       final bool hasMultiplePointers = _activePointers.length >= 2;
       if (hasTouchPointer || hasMultiplePointers) {
         _drawingSuspended = true;
@@ -496,7 +538,8 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
         await imagesDir.create(recursive: true);
       }
 
-      final String fileName = "${DateTime.now().millisecondsSinceEpoch}_${p.basename(image.path)}";
+      final String fileName =
+          "${DateTime.now().millisecondsSinceEpoch}_${p.basename(image.path)}";
       final String newPath = p.join(imagesDir.path, fileName);
       await File(image.path).copy(newPath);
 
@@ -506,18 +549,18 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
 
       final centerX = (-offset.dx + viewportSize.width / 2) / scale;
       final centerY = (-offset.dy + viewportSize.height / 2) / scale;
-      
+
       final globalPos = Offset(centerX - 100, centerY - 100);
 
-      final newImageData = ImageData(
-        position: globalPos,
-        imagePath: newPath,
-      );
+      final newImageData = ImageData(position: globalPos, imagePath: newPath);
 
       widget.topCanvasKey.currentState?.addImage(newImageData);
       _onToolChanged(DrawingTool.lasso);
       _recordHistory();
-      final int pageIdx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+      final int pageIdx = (centerY / _basePageHeight).floor().clamp(
+        0,
+        widget.pages.length - 1,
+      );
       _updateThumbnailCache(pageIdx);
     }
   }
@@ -549,7 +592,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       );
 
       _recomputeContentBounds();
-      
+
       final thresholdY = insertIndex * _basePageHeight;
       final shiftDelta = Offset(0, _basePageHeight);
       widget.topCanvasKey.currentState?.shiftContent(thresholdY, shiftDelta);
@@ -577,10 +620,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     );
 
     setState(() {
-      widget.pages.insert(
-        insertIndex.clamp(0, widget.pages.length),
-        duplicate,
-      );
+      widget.pages.insert(insertIndex.clamp(0, widget.pages.length), duplicate);
 
       _recomputeContentBounds();
 
@@ -593,7 +633,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     _updateThumbnailCache(insertIndex);
     _scrollToPage(insertIndex);
   }
-  
+
   void _deletePage(Size viewportSize, {int? atIndex}) {
     if (_numPages <= 1) return;
 
@@ -607,7 +647,11 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       final pageEndY = (deleteIndex + 1) * _basePageHeight;
       final shiftDelta = Offset(0, -_basePageHeight);
 
-      widget.topCanvasKey.currentState?.deletePageContent(pageStartY, pageEndY, shiftDelta);
+      widget.topCanvasKey.currentState?.deletePageContent(
+        pageStartY,
+        pageEndY,
+        shiftDelta,
+      );
 
       // Update thumbnail cache by ID
       final img = _thumbnailCache.remove(pageToDelete.id);
@@ -639,8 +683,12 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       final shiftUp = Offset(0, (index - targetIndex) * _basePageHeight);
 
       widget.topCanvasKey.currentState?.movePageContent(
-        pageStartY, pageEndY, shiftDown,
-        targetStartY, targetEndY, shiftUp,
+        pageStartY,
+        pageEndY,
+        shiftDown,
+        targetStartY,
+        targetEndY,
+        shiftUp,
       );
 
       // Thumbnail cache remains valid for existing pages since it's ID-based.
@@ -700,20 +748,27 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
 
   void _eraseFromBottom(Offset position) {
     bool changed = false;
-    final double threshold = (widget.topCanvasKey.currentState?.penSize ?? 1.0) * 2.0;
-    final int pageIdx = (position.dy / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
+    final double threshold =
+        (widget.topCanvasKey.currentState?.penSize ?? 1.0) * 2.0;
+    final int pageIdx = (position.dy / _basePageHeight).floor().clamp(
+      0,
+      widget.pages.length - 1,
+    );
     final page = widget.pages[pageIdx];
     final relativePos = position - Offset(0, pageIdx * _basePageHeight);
 
     setState(() {
       final initialStrokeCount = page.strokes.length;
-      page.strokes.removeWhere((stroke) => stroke.points.any((p) => (p - relativePos).distance < threshold));
+      page.strokes.removeWhere(
+        (stroke) =>
+            stroke.points.any((p) => (p - relativePos).distance < threshold),
+      );
       if (page.strokes.length != initialStrokeCount) changed = true;
 
       final initialImageCount = page.images.length;
       page.images.removeWhere((img) => img.getBounds().contains(relativePos));
       if (page.images.length != initialImageCount) changed = true;
-      
+
       final initialTextCount = page.texts.length;
       page.texts.removeWhere((txt) => txt.getBounds().contains(relativePos));
       if (page.texts.length != initialTextCount) changed = true;
@@ -733,7 +788,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       final page = widget.pages[i];
       final List<Stroke> remaining = [];
       final pageOffset = Offset(0, i * _basePageHeight);
-      
+
       for (final stroke in page.strokes) {
         // Translate stroke to global for lasso check
         final globalStroke = stroke.translate(pageOffset);
@@ -761,7 +816,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       final page = widget.pages[i];
       final List<ImageData> remaining = [];
       final pageOffset = Offset(0, i * _basePageHeight);
-      
+
       for (final img in page.images) {
         final globalImg = img.translate(pageOffset);
         final bounds = globalImg.getBounds();
@@ -788,7 +843,11 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       final page = widget.pages[pageIndex];
       final pageOffset = Offset(0, pageIndex * _basePageHeight);
 
-      for (int imageIndex = page.images.length - 1; imageIndex >= 0; imageIndex--) {
+      for (
+        int imageIndex = page.images.length - 1;
+        imageIndex >= 0;
+        imageIndex--
+      ) {
         final image = page.images[imageIndex];
         final globalImage = image.translate(pageOffset);
         if (!globalImage.getBounds().contains(position)) continue;
@@ -803,14 +862,14 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     }
     return null;
   }
-  
+
   List<TextData> _selectTextsFromBottom(Path lassoPath) {
     final List<TextData> selected = [];
     for (int i = 0; i < widget.pages.length; i++) {
       final page = widget.pages[i];
       final List<TextData> remaining = [];
       final pageOffset = Offset(0, i * _basePageHeight);
-      
+
       for (final txt in page.texts) {
         final globalTxt = txt.translate(pageOffset);
         final bounds = globalTxt.getBounds();
@@ -837,7 +896,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
       if (_selectedTool == DrawingTool.highlighter) {
         // Standardize alpha for highlighter comparisons and storage
         final highlighterColor = color.withAlpha(77);
-        
+
         if (highlighterColor.value == _highlighterSecondaryColor.value) {
           final temp = _highlighterPrimaryColor;
           _highlighterPrimaryColor = _highlighterSecondaryColor;
@@ -887,8 +946,6 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
@@ -906,15 +963,17 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
         final viewportSize = Size(safeWidth, safeHeight);
 
         if (_basePageHeight <= 0) {
-           _basePageHeight = HandwrittenNote.logicalPageHeight;
-           _pageWidth = HandwrittenNote.logicalPageWidth;
-           _pageHeight = _basePageHeight * widget.pages.length;
-           final double fitScale = safeHeight > 0 ? (safeHeight / (1.25 * _basePageHeight)) : 1.0;
-           _transformationController.initialize(
-              pageWidth: _pageWidth,
-              viewportWidth: safeWidth,
-              referenceScale: fitScale,
-           );
+          _basePageHeight = HandwrittenNote.logicalPageHeight;
+          _pageWidth = HandwrittenNote.logicalPageWidth;
+          _pageHeight = _basePageHeight * widget.pages.length;
+          final double fitScale = safeHeight > 0
+              ? (safeHeight / (1.25 * _basePageHeight))
+              : 1.0;
+          _transformationController.initialize(
+            pageWidth: _pageWidth,
+            viewportWidth: safeWidth,
+            referenceScale: fitScale,
+          );
         }
 
         return SizedBox(
@@ -975,7 +1034,7 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                             child: child,
                           );
                         },
-                                child: SizedBox(
+                        child: SizedBox(
                           width: _pageWidth,
                           height: _pageHeight,
                           child: Stack(
@@ -987,7 +1046,8 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                                   pageWidth: _pageWidth,
                                   basePageHeight: _basePageHeight,
                                   paperType: widget.paperType,
-                                  resolvePageBackground: widget.resolvePageBackground,
+                                  resolvePageBackground:
+                                      widget.resolvePageBackground,
                                   currentPage: _currentPageIndex,
                                 ),
                               ),
@@ -995,7 +1055,10 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                                 if ((i - _currentPageIndex).abs() > 1) {
                                   return Positioned(
                                     top: i * _basePageHeight,
-                                    child: SizedBox(width: _pageWidth, height: _basePageHeight),
+                                    child: SizedBox(
+                                      width: _pageWidth,
+                                      height: _basePageHeight,
+                                    ),
                                   );
                                 }
                                 final page = widget.pages[i];
@@ -1004,82 +1067,110 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                                   child: Container(
                                     width: _pageWidth,
                                     height: _basePageHeight,
-                                    color: Colors.transparent, // Important: let background show through
+                                    color: Colors
+                                        .transparent, // Important: let background show through
                                     child: Stack(
                                       children: [
-                                        ...page.images.map((img) => Positioned(
-                                          left: img.position.dx,
-                                          top: img.position.dy,
-                                          child: Image.file(
-                                            File(img.imagePath),
-                                            width: img.width,
-                                            height: img.height,
-                                            fit: BoxFit.contain,
+                                        ...page.images.map(
+                                          (img) => Positioned(
+                                            left: img.position.dx,
+                                            top: img.position.dy,
+                                            child: Image.file(
+                                              File(img.imagePath),
+                                              width: img.width,
+                                              height: img.height,
+                                              fit: BoxFit.contain,
+                                            ),
                                           ),
-                                        )),
-                                        ...page.texts.map((txt) => Positioned(
-                                          left: txt.position.dx,
-                                          top: txt.position.dy,
-                                          width: txt.width,
-                                          height: txt.height,
-                                          child: Text(
-                                            txt.text,
-                                            style: TextStyle(fontSize: txt.fontSize, color: txt.color),
+                                        ),
+                                        ...page.texts.map(
+                                          (txt) => Positioned(
+                                            left: txt.position.dx,
+                                            top: txt.position.dy,
+                                            width: txt.width,
+                                            height: txt.height,
+                                            child: Text(
+                                              txt.text,
+                                              style: TextStyle(
+                                                fontSize: txt.fontSize,
+                                                color: txt.color,
+                                              ),
+                                            ),
                                           ),
-                                        )),
+                                        ),
                                         BottomCanvas(strokes: page.strokes),
                                       ],
                                     ),
                                   ),
                                 );
                               }),
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: icon_color.withAlpha(20),
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                  child: TopCanvas(
-                                    key: widget.topCanvasKey,
-                                    onCommit: (strokes, images, texts) {
-                                      if (_basePageHeight <= 0) return;
-                                      for (final s in strokes) {
-                                        final centerY = s.getBounds().center.dy;
-                                        final idx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
-                                        widget.pages[idx].strokes.add(s.translate(Offset(0, -idx * _basePageHeight)));
-                                      }
-                                      for (final img in images) {
-                                        final centerY = img.getBounds().center.dy;
-                                        final idx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
-                                        widget.pages[idx].images.add(img.translate(Offset(0, -idx * _basePageHeight)));
-                                      }
-                                      for (final txt in texts) {
-                                        final centerY = txt.getBounds().center.dy;
-                                        final idx = (centerY / _basePageHeight).floor().clamp(0, widget.pages.length - 1);
-                                        widget.pages[idx].texts.add(txt.translate(Offset(0, -idx * _basePageHeight)));
-                                      }
-                                      widget.onCommit(strokes, images, texts);
-                                      _recordHistory();
-                                    },
-                                    onChanged: () {
-                                      setState(() {});
-                                      _recordHistory();
-                                    },
-                                    suspended: () => _drawingSuspended,
-                                    zoom: () => _transformationController.zoom,
-                                    onEraseFromBottom: _eraseFromBottom,
-                                    onSelectStrokesFromBottom: _selectFromBottom,
-                                    onSelectImagesFromBottom: _selectImagesFromBottom,
-                                    onHitImageFromBottom: _hitImageFromBottom,
-                                    onSelectTextsFromBottom: _selectTextsFromBottom,
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: icon_color.withAlpha(20),
+                                    width: 0.5,
                                   ),
                                 ),
-                              ],
-                            ),
+                                child: TopCanvas(
+                                  key: widget.topCanvasKey,
+                                  onCommit: (strokes, images, texts) {
+                                    if (_basePageHeight <= 0) return;
+                                    for (final s in strokes) {
+                                      final centerY = s.getBounds().center.dy;
+                                      final idx = (centerY / _basePageHeight)
+                                          .floor()
+                                          .clamp(0, widget.pages.length - 1);
+                                      widget.pages[idx].strokes.add(
+                                        s.translate(
+                                          Offset(0, -idx * _basePageHeight),
+                                        ),
+                                      );
+                                    }
+                                    for (final img in images) {
+                                      final centerY = img.getBounds().center.dy;
+                                      final idx = (centerY / _basePageHeight)
+                                          .floor()
+                                          .clamp(0, widget.pages.length - 1);
+                                      widget.pages[idx].images.add(
+                                        img.translate(
+                                          Offset(0, -idx * _basePageHeight),
+                                        ),
+                                      );
+                                    }
+                                    for (final txt in texts) {
+                                      final centerY = txt.getBounds().center.dy;
+                                      final idx = (centerY / _basePageHeight)
+                                          .floor()
+                                          .clamp(0, widget.pages.length - 1);
+                                      widget.pages[idx].texts.add(
+                                        txt.translate(
+                                          Offset(0, -idx * _basePageHeight),
+                                        ),
+                                      );
+                                    }
+                                    widget.onCommit(strokes, images, texts);
+                                    _recordHistory();
+                                  },
+                                  onChanged: () {
+                                    setState(() {});
+                                    _recordHistory();
+                                  },
+                                  suspended: () => _drawingSuspended,
+                                  zoom: () => _transformationController.zoom,
+                                  onEraseFromBottom: _eraseFromBottom,
+                                  onSelectStrokesFromBottom: _selectFromBottom,
+                                  onSelectImagesFromBottom:
+                                      _selectImagesFromBottom,
+                                  onHitImageFromBottom: _hitImageFromBottom,
+                                  onSelectTextsFromBottom:
+                                      _selectTextsFromBottom,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
+                    ),
 
                     Positioned(
                       top: 15,
@@ -1089,8 +1180,8 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                         30.0,
                         90,
                         "back",
-                            () {
-                              widget.onBack?.call();
+                        () {
+                          widget.onBack?.call();
                         },
                         context,
                         MediaQuery.of(context).size.width,
@@ -1100,90 +1191,113 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                     ),
                     show_all_buttons
                         ? (MediaQuery.of(context).size.width < 750)
-                        ? Positioned(
-                      top: 10,
-                      left: MediaQuery.of(context).size.width / 2 - 125 > 60
-                          ? MediaQuery.of(context).size.width / 2 - 125
-                          : 60,
-                      child: consolidated_tool_array(
-                        context,
-                        _handleUndo,
-                        _handleRedo,
-                        canUndo: _historyManager.canUndo,
-                        canRedo: _historyManager.canRedo,
-                        selectedTool: _selectedTool,
-                        onToolChanged: _onToolChanged,
-                        onAddPage: () => _addPage(viewportSize),
-                        onImportImage: _handleImportImage,
-                        palmRejectionEnabled: _palmRejectionEnabled,
-                        onTogglePalmRejection: _togglePalmRejection,
-                      ),
-                    )
-                        : Positioned(
-                      top: 10,
-                      left: 70,
-                      child: history_button_array(
-                        context,
-                        _handleUndo,
-                        _handleRedo,
-                        canUndo: _historyManager.canUndo,
-                        canRedo: _historyManager.canRedo,
-                      ),
-                    )
+                              ? Positioned(
+                                  top: 10,
+                                  left:
+                                      MediaQuery.of(context).size.width / 2 -
+                                              125 >
+                                          60
+                                      ? MediaQuery.of(context).size.width / 2 -
+                                            125
+                                      : 60,
+                                  child: consolidated_tool_array(
+                                    context,
+                                    _handleUndo,
+                                    _handleRedo,
+                                    canUndo: _historyManager.canUndo,
+                                    canRedo: _historyManager.canRedo,
+                                    selectedTool: _selectedTool,
+                                    onToolChanged: _onToolChanged,
+                                    onAddPage: () => _addPage(viewportSize),
+                                    onImportImage: _handleImportImage,
+                                    onExportPdf: widget.onExportPdf,
+                                    palmRejectionEnabled: _palmRejectionEnabled,
+                                    onTogglePalmRejection: _togglePalmRejection,
+                                  ),
+                                )
+                              : Positioned(
+                                  top: 10,
+                                  left: 70,
+                                  child: history_button_array(
+                                    context,
+                                    _handleUndo,
+                                    _handleRedo,
+                                    canUndo: _historyManager.canUndo,
+                                    canRedo: _historyManager.canRedo,
+                                  ),
+                                )
                         : const SizedBox.shrink(),
                     show_all_buttons
                         ? Align(
-                      alignment: Alignment.topCenter,
-                      child: (MediaQuery.of(context).size.width >= 750)
-                          ? Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: tool_button_array(
-                          context,
-                          selectedTool: _selectedTool,
-                          onToolChanged: _onToolChanged,
-                          onAddPage: () => _addPage(viewportSize),
-                          onImportImage: _handleImportImage,
-                          palmRejectionEnabled: _palmRejectionEnabled,
-                          onTogglePalmRejection: _togglePalmRejection,
-                        ),
-                      )
-                          : const SizedBox.shrink(),
-                    )
+                            alignment: Alignment.topCenter,
+                            child: (MediaQuery.of(context).size.width >= 750)
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: tool_button_array(
+                                      context,
+                                      selectedTool: _selectedTool,
+                                      onToolChanged: _onToolChanged,
+                                      onAddPage: () => _addPage(viewportSize),
+                                      onImportImage: _handleImportImage,
+                                      onExportPdf: widget.onExportPdf,
+                                      palmRejectionEnabled:
+                                          _palmRejectionEnabled,
+                                      onTogglePalmRejection:
+                                          _togglePalmRejection,
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          )
                         : const SizedBox.shrink(),
                     show_all_buttons
                         ? Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 10),
-                        child: left_button_array(
-                          context,
-                          selectedTool: _selectedTool,
-                          currentSize: widget.topCanvasKey.currentState?.penSize ?? 1.0,
-                          onIncrementSize: () => widget.topCanvasKey.currentState?.changeSize(0.5),
-                          onDecrementSize: () => widget.topCanvasKey.currentState?.changeSize(-0.5),
-                          onSizeDelta: (delta) => widget.topCanvasKey.currentState?.changeSize(delta),
-                          onSwitchEraserType: _switchEraserType,
-                          currentPenColor: (_selectedTool == DrawingTool.highlighter)
-                              ? _highlighterPrimaryColor
-                              : _primaryColor,
-                          quickColors: (_selectedTool == DrawingTool.highlighter)
-                              ? [
-                                  _highlighterSecondaryColor,
-                                  _highlighterThirdColor,
-                                  _highlighterFourthColor,
-                                ]
-                              : [
-                                  _secondaryColor,
-                                  _thirdColor,
-                                  _fourthColor,
-                                ],
-                          onColorChanged: _onColorChanged,
-                          onOpenColorPicker: () => setState(() => _showColorPicker = !_showColorPicker),
-                          palmRejectionEnabled: _palmRejectionEnabled,
-                          onTogglePalmRejection: _togglePalmRejection,
-                        ),
-                      ),
-                    )
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 10),
+                              child: left_button_array(
+                                context,
+                                selectedTool: _selectedTool,
+                                currentSize:
+                                    widget.topCanvasKey.currentState?.penSize ??
+                                    1.0,
+                                onIncrementSize: () => widget
+                                    .topCanvasKey
+                                    .currentState
+                                    ?.changeSize(0.5),
+                                onDecrementSize: () => widget
+                                    .topCanvasKey
+                                    .currentState
+                                    ?.changeSize(-0.5),
+                                onSizeDelta: (delta) => widget
+                                    .topCanvasKey
+                                    .currentState
+                                    ?.changeSize(delta),
+                                onSwitchEraserType: _switchEraserType,
+                                currentPenColor:
+                                    (_selectedTool == DrawingTool.highlighter)
+                                    ? _highlighterPrimaryColor
+                                    : _primaryColor,
+                                quickColors:
+                                    (_selectedTool == DrawingTool.highlighter)
+                                    ? [
+                                        _highlighterSecondaryColor,
+                                        _highlighterThirdColor,
+                                        _highlighterFourthColor,
+                                      ]
+                                    : [
+                                        _secondaryColor,
+                                        _thirdColor,
+                                        _fourthColor,
+                                      ],
+                                onColorChanged: _onColorChanged,
+                                onOpenColorPicker: () => setState(
+                                  () => _showColorPicker = !_showColorPicker,
+                                ),
+                                palmRejectionEnabled: _palmRejectionEnabled,
+                                onTogglePalmRejection: _togglePalmRejection,
+                              ),
+                            ),
+                          )
                         : const SizedBox.shrink(),
                     if (_showColorPicker)
                       Padding(
@@ -1197,11 +1311,13 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                               });
                             },
                             child: CanvasColorPickerOverlay(
-                              initialColor: (_selectedTool == DrawingTool.highlighter)
+                              initialColor:
+                                  (_selectedTool == DrawingTool.highlighter)
                                   ? _highlighterPrimaryColor
                                   : _primaryColor,
                               onColorChanged: _onColorChanged,
-                              onDismiss: () => setState(() => _showColorPicker = false),
+                              onDismiss: () =>
+                                  setState(() => _showColorPicker = false),
                             ),
                           ),
                         ),
@@ -1227,9 +1343,12 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                             currentPage: _currentPageIndex,
                             numPages: _numPages,
                             onMovePage: _movePage,
-                            onAddPageBelow: (index) => _addPage(viewportSize, atIndex: index),
-                            onDuplicatePage: (index) => _duplicatePage(viewportSize, atIndex: index),
-                            onDeletePage: (index) => _deletePage(viewportSize, atIndex: index),
+                            onAddPageBelow: (index) =>
+                                _addPage(viewportSize, atIndex: index),
+                            onDuplicatePage: (index) =>
+                                _duplicatePage(viewportSize, atIndex: index),
+                            onDeletePage: (index) =>
+                                _deletePage(viewportSize, atIndex: index),
                             onPageTap: _scrollToPage,
                             onClose: _closePageManager,
                           ),
@@ -1242,7 +1361,9 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           single_circle_button(
-                            show_all_buttons ? LucideIcons.maximize : LucideIcons.minimize,
+                            show_all_buttons
+                                ? LucideIcons.maximize
+                                : LucideIcons.minimize,
                             20,
                             90,
                             "minimize/maximize",
@@ -1269,15 +1390,28 @@ class CanvasViewState extends State<CanvasView> with TickerProviderStateMixin {
                               button_width: 50,
                               bgAlpha: 255,
                             ),
+                            const SizedBox(width: 10),
+                            single_circle_button(
+                              LucideIcons.upload,
+                              20,
+                              90,
+                              "export PDF",
+                              () => widget.onExportPdf?.call(),
+                              context,
+                              screenSize.width,
+                              button_width: 50,
+                              bgAlpha: 255,
+                            ),
                           ],
                         ],
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
             ),
-          ));
+          ),
+        );
       },
     );
   }
@@ -1293,7 +1427,8 @@ class _PageMovedPopup extends StatefulWidget {
   State<_PageMovedPopup> createState() => _PageMovedPopupState();
 }
 
-class _PageMovedPopupState extends State<_PageMovedPopup> with SingleTickerProviderStateMixin {
+class _PageMovedPopupState extends State<_PageMovedPopup>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacityAnimation;
   late Animation<Offset> _slideAnimation;
@@ -1307,16 +1442,15 @@ class _PageMovedPopupState extends State<_PageMovedPopup> with SingleTickerProvi
       reverseDuration: const Duration(milliseconds: 100),
     );
 
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1.0),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _controller.forward();
 
@@ -1349,7 +1483,10 @@ class _PageMovedPopupState extends State<_PageMovedPopup> with SingleTickerProvi
             child: Material(
               color: Colors.transparent,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black87,
                   borderRadius: BorderRadius.circular(24),

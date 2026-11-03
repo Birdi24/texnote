@@ -7,7 +7,8 @@ import '../../models/HandwrittenNote.dart';
 /// Resolves the background image path for a NotePage, rendering
 /// it on demand if needed (e.g. from a PDF). Returns null if there's no
 /// background for that page.
-typedef PageBackgroundResolver = Future<String?> Function(NotePage page);
+typedef PageBackgroundResolver =
+    Future<String?> Function(NotePage page, {required bool preview});
 
 class CanvasBackground extends StatelessWidget {
   final List<NotePage> pages;
@@ -26,7 +27,7 @@ class CanvasBackground extends StatelessWidget {
     required this.paperType,
     this.resolvePageBackground,
     this.currentPage = 0,
-    this.windowRadius = 2,
+    this.windowRadius = 1,
   });
 
   @override
@@ -35,57 +36,52 @@ class CanvasBackground extends StatelessWidget {
       maxHeight: double.infinity,
       alignment: Alignment.topCenter,
       child: Column(
-        children: List.generate(
-          pages.length,
-          (index) {
-            final page = pages[index];
-            return Container(
-              width: pageWidth,
-              height: basePageHeight,
-              decoration: BoxDecoration(
-                color: BG,
-                border: Border(
-                  bottom: BorderSide(
-                    color: icon_color.withAlpha(40),
-                    width: 1.0,
-                  ),
-                ),
+        children: List.generate(pages.length, (index) {
+          final page = pages[index];
+          return Container(
+            width: pageWidth,
+            height: basePageHeight,
+            decoration: BoxDecoration(
+              color: BG,
+              border: Border(
+                bottom: BorderSide(color: icon_color.withAlpha(40), width: 1.0),
               ),
-              child: Stack(
-                children: [
-                  PageBackgroundImage(
-                    key: ValueKey('page_bg_${page.id}'),
-                    page: page,
-                    width: pageWidth,
-                    height: basePageHeight,
-                    resolver: resolvePageBackground,
-                    inWindow: (index - currentPage).abs() <= windowRadius,
+            ),
+            child: Stack(
+              children: [
+                PageBackgroundImage(
+                  key: ValueKey('page_bg_${page.id}'),
+                  page: page,
+                  width: pageWidth,
+                  height: basePageHeight,
+                  resolver: resolvePageBackground,
+                  inWindow: (index - currentPage).abs() <= windowRadius,
+                  isCurrent: index == currentPage,
+                ),
+                if (paperType != "blank")
+                  CustomPaint(
+                    size: Size(pageWidth, basePageHeight),
+                    painter: PaperPainter(paperType),
                   ),
-                  if (paperType != "blank")
-                    CustomPaint(
-                      size: Size(pageWidth, basePageHeight),
-                      painter: PaperPainter(paperType),
-                    ),
-                  if (index > 0 || page.background != null)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Text(
-                          "Page ${index + 1}",
-                          style: AppStyles.icon_text.copyWith(
-                            fontSize: 14,
-                            color: icon_color.withAlpha(30),
-                            fontWeight: FontWeight.bold,
-                          ),
+                if (index > 0 || page.background != null)
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(
+                        "Page ${index + 1}",
+                        style: AppStyles.icon_text.copyWith(
+                          fontSize: 14,
+                          color: icon_color.withAlpha(30),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                ],
-              ),
-            );
-          },
-        ),
+                  ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
@@ -97,6 +93,7 @@ class PageBackgroundImage extends StatefulWidget {
   final double height;
   final PageBackgroundResolver? resolver;
   final bool inWindow;
+  final bool isCurrent;
 
   const PageBackgroundImage({
     super.key,
@@ -105,6 +102,7 @@ class PageBackgroundImage extends StatefulWidget {
     required this.height,
     required this.resolver,
     required this.inWindow,
+    required this.isCurrent,
   });
 
   @override
@@ -128,60 +126,74 @@ class PageBackgroundImageState extends State<PageBackgroundImage> {
     super.didUpdateWidget(oldWidget);
     if (widget.inWindow && !oldWidget.inWindow) {
       _load();
-    } else if (!widget.inWindow && oldWidget.inWindow) {
-      _evict();
+    } else if (widget.isCurrent && !oldWidget.isCurrent) {
+      _load();
     }
   }
 
   Future<void> _load() async {
     var path = _resolvedPath;
-    
-    // If it's a PDF marker, it's not a real path yet
-    bool isMarker = path != null && path.startsWith("pdf_page:");
-    
-    // Check if the path is invalid (marker or missing file)
-    bool isInvalid = path == null || isMarker;
-    if (!isInvalid && path != null) {
-      if (!await File(path).exists()) {
-        isInvalid = true;
-      }
-    }
-    
-    if (isInvalid && widget.resolver != null && !_resolving) {
-      _resolving = true;
-      path = await widget.resolver!(widget.page);
-      _resolving = false;
-      if (!mounted) return;
-      setState(() => _resolvedPath = path);
+    if (_resolving || widget.resolver == null) return;
+
+    final isMarker = path == null || path.startsWith('pdf_page:');
+    final isPreview = path?.endsWith('.preview.jpg') ?? false;
+    final pathExists = !isMarker && await File(path).exists();
+    if (pathExists && !isPreview) {
+      _setImagePath(path);
       return;
     }
-    
-    if (path != null && !path.startsWith("pdf_page:") && mounted) {
-      setState(() => _fileImage = FileImage(File(path!)));
+
+    _resolving = true;
+    if (mounted) setState(() {});
+    try {
+      if (!pathExists) {
+        path = await widget.resolver!(widget.page, preview: true);
+        if (path != null) _setImagePath(path);
+      }
+
+      if (mounted &&
+          widget.inWindow &&
+          widget.isCurrent &&
+          (path?.endsWith('.preview.jpg') ?? false)) {
+        await Future<void>.delayed(const Duration(milliseconds: 180));
+        if (mounted && widget.inWindow && widget.isCurrent) {
+          final fullPath = await widget.resolver!(widget.page, preview: false);
+          if (fullPath != null) _setImagePath(fullPath);
+        }
+      }
+    } catch (error) {
+      debugPrint('Failed to resolve page background: $error');
+    } finally {
+      _resolving = false;
+      if (mounted) setState(() {});
     }
   }
 
-  void _evict() {
-    _fileImage?.evict();
-    _fileImage = null;
+  void _setImagePath(String path) {
+    if (!mounted) return;
+    setState(() {
+      _resolvedPath = path;
+      _fileImage = FileImage(File(path));
+    });
   }
 
   @override
   void dispose() {
-    _evict();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.inWindow || _resolvedPath == null || _resolvedPath!.startsWith("pdf_page:")) {
+    if (!widget.inWindow ||
+        _resolvedPath == null ||
+        _resolvedPath!.startsWith("pdf_page:")) {
       return SizedBox(
         width: widget.width,
         height: widget.height,
         child: Center(
-          child: _resolving 
-            ? const CircularProgressIndicator() 
-            : const SizedBox.shrink(),
+          child: _resolving
+              ? const CircularProgressIndicator()
+              : const SizedBox.shrink(),
         ),
       );
     }

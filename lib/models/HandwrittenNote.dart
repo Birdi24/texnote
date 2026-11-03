@@ -381,37 +381,35 @@ class HandwrittenNote extends Note {
         directoryPath = p.dirname(path);
       }
 
-      final newPath = p.join(directoryPath, '$newTitle.note');
+      final currentFilePath = await File(path).exists() ? path : null;
+      final newPath = await uniqueFilePath(
+        directoryPath,
+        '$newTitle.note',
+        currentPath: currentFilePath,
+      );
+      newTitle = p.basenameWithoutExtension(newPath);
 
       debugPrint("NewPath: $newPath");
 
       // Sync PDF background first so get_json() uses updated paths/markers
       await _syncPdfBackground(directoryPath, newTitle);
 
-      // Rename an existing BirdWrite file
-      if (oldTitle.isNotEmpty && newTitle != oldTitle) {
-        debugPrint("Title has changed");
-
-        final oldPath = p.join(directoryPath, '$oldTitle.note');
-        final oldFile = File(oldPath);
-
-        if (await oldFile.exists()) {
-          await oldFile.delete();
-          debugPrint("$oldPath deleted!");
-        }
-
-        // Also delete old PDF background
-        final oldPdfPath = p.join(directoryPath, '${oldTitle}_bg.pdf');
-        final oldPdfFile = File(oldPdfPath);
-        if (await oldPdfFile.exists()) {
-          await oldPdfFile.delete();
-          debugPrint("$oldPdfPath deleted!");
-        }
-      }
-
       final file = File(newPath);
 
       await file.writeAsString(get_json());
+
+      if (oldTitle.isNotEmpty &&
+          currentFilePath != null &&
+          newPath != currentFilePath) {
+        if (await File(currentFilePath).exists()) {
+          await File(currentFilePath).delete();
+        }
+
+        final oldPdfPath = p.join(directoryPath, '${oldTitle}_bg.pdf');
+        if (oldPdfPath != pdfSourcePath && await File(oldPdfPath).exists()) {
+          await File(oldPdfPath).delete();
+        }
+      }
 
       title = newTitle;
       path = p.canonicalize(file.path);
@@ -428,12 +426,14 @@ class HandwrittenNote extends Note {
   @override
   Future<Note> duplicate_note() async {
     try {
-      String newPath;
-      if (path.endsWith('.note')) {
-        newPath = path.replaceFirst(".note", "-Copy.note");
-      } else {
-        newPath = p.join(path, "${sanitizeFileName(title)}-Copy.note");
-      }
+      final directoryPath = path.endsWith('.note')
+          ? p.dirname(path)
+          : path;
+      final newPath = await uniqueFilePath(
+        directoryPath,
+        '${sanitizeFileName(title)}-Copy.note',
+      );
+      final duplicateTitle = p.basenameWithoutExtension(newPath);
 
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
@@ -456,7 +456,7 @@ class HandwrittenNote extends Note {
           .toList();
 
       HandwrittenNote dup = HandwrittenNote(
-        title: "$title-Copy",
+        title: duplicateTitle,
         date: DateTime.now(),
         path: newPath,
         type: type,

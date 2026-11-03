@@ -107,6 +107,9 @@ class Folder {
       for (var entity in entities) {
         if (entity is Directory) {
           final relativePath = p.relative(entity.path, from: appDir.path);
+          if (p.split(relativePath).first == 'note_images') {
+            continue;
+          }
           if (relativePath.startsWith('.') || 
               relativePath.contains('/.') || 
               relativePath.startsWith('pdf_imports') ||

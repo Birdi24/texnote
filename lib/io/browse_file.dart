@@ -137,6 +137,13 @@ Future<List<Note>> collect() async {
     if (path.endsWith('.txt') || path.endsWith('.note')) return true;
     
     if (path.endsWith('.pdf')) {
+      final fileName = p.basenameWithoutExtension(path);
+      if (fileName.endsWith('_bg')) {
+        final noteTitle = fileName.substring(0, fileName.length - 3);
+        final owningNote = p.join(p.dirname(path), '$noteTitle.note');
+        if (notePaths.contains(owningNote)) return false;
+      }
+
       // Only include raw PDF if no corresponding .note file exists
       final notePath = path.replaceAll('.pdf', '.note');
       return !notePaths.contains(notePath);

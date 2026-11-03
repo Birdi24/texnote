@@ -15,16 +15,14 @@ import 'TopCanvas.dart';
 class HandwrittenNotePage extends StatefulWidget {
   final HandwrittenNote note;
 
-  const HandwrittenNotePage({
-    super.key,
-    required this.note,
-  });
+  const HandwrittenNotePage({super.key, required this.note});
 
   @override
   State<HandwrittenNotePage> createState() => _HandwrittenNotePage();
 }
 
-class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindingObserver {
+class _HandwrittenNotePage extends State<HandwrittenNotePage>
+    with WidgetsBindingObserver {
   // Timer for auto-saving the note
   Timer? _autoSaveTimer;
   bool _isSaving = false;
@@ -32,11 +30,13 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
 
   // Top canvas holds frequently refreshing parts of the note, like the last 50 strokes
   final GlobalKey<TopCanvasState> _topCanvasKey = GlobalKey<TopCanvasState>();
-  final GlobalKey<CanvasViewState> _canvasViewKey = GlobalKey<CanvasViewState>();
+  final GlobalKey<CanvasViewState> _canvasViewKey =
+      GlobalKey<CanvasViewState>();
 
   bool changed = false;
   String old_title = "";
   LazyPdfPageStore? _pdfStore;
+  late Future<LazyPdfPageStore?> _pdfStoreFuture;
 
   Future<void> _handleBack() async {
     if (_isSaving) return;
@@ -64,18 +64,21 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
     WidgetsBinding.instance.addObserver(this);
     old_title = widget.note.title;
     _autoSaveTimer = Timer.periodic(const Duration(minutes: 1), (_) => save());
+    _pdfStoreFuture = _initializePdfStore();
+  }
 
-    if (widget.note.pdfSourcePath.isNotEmpty) {
-      getApplicationDocumentsDirectory().then((appDir) {
-        if (!mounted) return;
-        setState(() {
-          _pdfStore = LazyPdfPageStore(
-            pdfPath: widget.note.pdfSourcePath,
-            noteDir: appDir,
-          );
-        });
-      });
-    }
+  Future<LazyPdfPageStore?> _initializePdfStore() async {
+    if (widget.note.pdfSourcePath.isEmpty) return null;
+
+    final appDir = await getApplicationDocumentsDirectory();
+    if (!mounted) return null;
+
+    final store = LazyPdfPageStore(
+      pdfPath: widget.note.pdfSourcePath,
+      noteDir: appDir,
+    );
+    setState(() => _pdfStore = store);
+    return store;
   }
 
   @override
@@ -88,30 +91,43 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       save();
     }
   }
 
   void _markChanged() {
-    if (!changed) {setState(() {changed = true;});}
+    if (!changed) {
+      setState(() {
+        changed = true;
+      });
+    }
   }
 
-  Future<String?> _resolvePageBackground(NotePage page) async {
-    if (_pdfStore == null) return null;
-    
+  Future<String?> _resolvePageBackground(
+    NotePage page, {
+    required bool preview,
+  }) async {
+    final store = _pdfStore ?? await _pdfStoreFuture;
+    if (store == null) return null;
+
     int? pdfPageNum;
-    
-    if (page.source.type == PageSourceType.pdf && page.source.originalIndex != null) {
+
+    if (page.source.type == PageSourceType.pdf &&
+        page.source.originalIndex != null) {
       pdfPageNum = page.source.originalIndex;
-    } else if (page.background != null && page.background!.startsWith("pdf_page:")) {
+    } else if (page.background != null &&
+        page.background!.startsWith("pdf_page:")) {
       pdfPageNum = int.tryParse(page.background!.split(":").last);
     }
-    
+
     if (pdfPageNum == null) return null;
 
-    final path = await _pdfStore!.pathForPage(pdfPageNum);
-    page.background = path; // cache result back onto the model
+    final path = preview
+        ? await store.previewPathForPage(pdfPageNum)
+        : await store.pathForPage(pdfPageNum);
+    if (!preview) page.background = path;
     return path;
   }
 
@@ -120,9 +136,9 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
     _topCanvasKey.currentState?.flush();
 
     if (!changed) return;
-    
+
     await widget.note.save(old_title);
-    
+
     if (mounted) {
       setState(() {
         changed = false;
@@ -132,8 +148,18 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
     old_title = widget.note.title;
   }
 
+  Future<void> _exportPdf() async {
+    _topCanvasKey.currentState?.flush();
+    await save();
+    await widget.note.exportAsPdf();
+  }
+
   /// commit top layer to the bottom layer
-  void _commitToBottom(List<Stroke> strokes, List<ImageData> images, List<TextData> texts) {
+  void _commitToBottom(
+    List<Stroke> strokes,
+    List<ImageData> images,
+    List<TextData> texts,
+  ) {
     // In the new architecture, CanvasView handles the partitioning.
     // This callback is now mainly for marking the note as changed.
     _markChanged();
@@ -168,23 +194,25 @@ class _HandwrittenNotePage extends State<HandwrittenNotePage> with WidgetsBindin
       child: Scaffold(
         backgroundColor: BG.withAlpha(252),
 
-          body: SafeArea(
-            child: LayoutBuilder(builder: (context, safeAreaConstraints) {
-            return CanvasView(
-              key: _canvasViewKey,
-              pages: widget.note.pages,
-              onCommit: _commitToBottom,
-              topCanvasKey: _topCanvasKey,
-              onSave: save,
-              changed: changed,
-              onChanged: _markChanged,
-              paperType: widget.note.paperType,
-              resolvePageBackground: _resolvePageBackground,
-              onPageChanged: (index) {
-                _pdfStore?.onCurrentPageChanged(index + 1);
-              },
-              onBack: _handleBack,
-            );
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, safeAreaConstraints) {
+              return CanvasView(
+                key: _canvasViewKey,
+                pages: widget.note.pages,
+                onCommit: _commitToBottom,
+                topCanvasKey: _topCanvasKey,
+                onSave: save,
+                changed: changed,
+                onChanged: _markChanged,
+                paperType: widget.note.paperType,
+                resolvePageBackground: _resolvePageBackground,
+                onPageChanged: (index) {
+                  _pdfStore?.onCurrentPageChanged(index + 1);
+                },
+                onBack: _handleBack,
+                onExportPdf: _exportPdf,
+              );
             },
           ),
         ),

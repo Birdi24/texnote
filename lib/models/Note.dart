@@ -52,7 +52,37 @@ abstract class Note {
   Future<void> exportAsPdf();
 
   String sanitizeFileName(String name) {
-    return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').startsWith('.') ? name.substring(1) : name;
+    return name
+        .trim()
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+        .replaceFirst(RegExp(r'^\.+'), '');
+  }
+
+  Future<String> uniqueFilePath(
+    String directoryPath,
+    String fileName, {
+    String? currentPath,
+  }) async {
+    final extension = p.extension(fileName);
+    final baseName = p.basenameWithoutExtension(fileName);
+    final normalizedCurrentPath = currentPath == null
+        ? null
+        : p.canonicalize(currentPath);
+
+    for (var suffix = 0; ; suffix++) {
+      final numberedName = suffix == 0
+          ? '$baseName$extension'
+          : '$baseName ($suffix)$extension';
+      final candidate = p.join(directoryPath, numberedName);
+      if (normalizedCurrentPath != null &&
+          p.canonicalize(candidate) == normalizedCurrentPath) {
+        return candidate;
+      }
+      if (await FileSystemEntity.type(candidate, followLinks: false) ==
+          FileSystemEntityType.notFound) {
+        return candidate;
+      }
+    }
   }
 
   Future<Note> duplicate_note();

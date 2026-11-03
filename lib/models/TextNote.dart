@@ -101,26 +101,27 @@ class TextNote extends Note {
         directoryPath = p.dirname(path);
       }
 
-      final newPath = p.join(directoryPath, '$newTitle.txt');
+      final currentFilePath = await File(path).exists() ? path : null;
+      final newPath = await uniqueFilePath(
+        directoryPath,
+        '$newTitle.txt',
+        currentPath: currentFilePath,
+      );
+      newTitle = p.basenameWithoutExtension(newPath);
 
       debugPrint("NewPath: $newPath");
-
-      // Rename an existing BirdWrite file
-      if (oldTitle.isNotEmpty && newTitle != oldTitle) {
-        debugPrint("Title has changed");
-
-        final oldPath = p.join(directoryPath, '$oldTitle.txt');
-        final oldFile = File(oldPath);
-
-        if (await oldFile.exists()) {
-          await oldFile.delete();
-          debugPrint("$oldPath deleted!");
-        }
-      }
 
       final file = File(newPath);
 
       await file.writeAsString(body);
+
+      if (oldTitle.isNotEmpty &&
+          currentFilePath != null &&
+          newPath != currentFilePath) {
+        if (await File(currentFilePath).exists()) {
+          await File(currentFilePath).delete();
+        }
+      }
 
       title = newTitle;
       path = p.canonicalize(file.path);
@@ -136,17 +137,17 @@ class TextNote extends Note {
   @override
   Future<Note> duplicate_note() async {
     try {
-      String newPath;
-      if (path.endsWith('.txt')) {
-        newPath = path.replaceFirst(".txt", "-Copy.txt");
-      } else {
-        newPath = p.join(path, "${sanitizeFileName(title)}-Copy.txt");
-      }
+      final directoryPath = path.endsWith('.txt') ? p.dirname(path) : path;
+      final newPath = await uniqueFilePath(
+        directoryPath,
+        '${sanitizeFileName(title)}-Copy.txt',
+      );
+      final duplicateTitle = p.basenameWithoutExtension(newPath);
 
       debugPrint("NEW PATH for duplicate: $newPath");
       final file = File(newPath);
       await file.writeAsString(body);
-      TextNote dup = TextNote(title :"$title-Copy",date: DateTime.now(),path: newPath, body: body, type: NoteType.TextNote);
+      TextNote dup = TextNote(title: duplicateTitle, date: DateTime.now(), path: newPath, body: body, type: NoteType.TextNote);
       return dup;
     }
     catch (e) {

@@ -1,6 +1,6 @@
 # BirdWrite
 
-A modern Flutter note-taking app for tablets and desktop development. BirdWrite supports handwritten and text notes, folders, collections, favorites, PDF-backed handwritten pages (under construction), and a browser-style tab system for working with multiple notes at once.
+A modern Flutter note-taking app for tablets and desktop development. BirdWrite supports handwritten and text notes, folders, collections, favorites, PDF-backed handwritten pages, and a browser-style tab system for working with multiple notes at once.
 
 **Project status:** Active development
 **Platform focus:** Android tablets
@@ -30,9 +30,10 @@ A modern Flutter note-taking app for tablets and desktop development. BirdWrite 
 - Shape correction for the current stroke i.e. straight looking lines become straight, a stroke held for 1.5+ seconds becomes a shapable rectangle
 - Multiple pages
 - Add, duplicate, delete and reorder pages
-- PDF pages as backgrounds *(under construction)*
+- Import PDFs as multi-page handwritten notes
+- Lazy PDF backgrounds with quick previews and sharper rendering for the current page
+- Cached PDF page images to improve revisiting nearby pages
 - Zoom and two-finger navigation
-- Lazy PDF page rendering for large documents *(under construction)*
 
 ### Folders
 
@@ -277,6 +278,8 @@ flutter build apk --release
 - Git for version control
 
 A physical tablet is recommended for testing handwritten notes because emulator input does not accurately reproduce stylus and multi-touch behaviour.
+
+PDF background rendering is implemented, but still needs full device and performance testing across large documents.
 
 ---
 
